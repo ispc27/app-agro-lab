@@ -1,0 +1,7 @@
+credentials:
+  usernames:
+    admin:
+      email: admin@agrolab.com
+      full_name: Agrolab
+      role: admin
+      password: "$2b$12$U7ayml.p7p88vUf39Uov6.5ml1/t6VLBu2OXSZv7K6fGV90GihWKm"
