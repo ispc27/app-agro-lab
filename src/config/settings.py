@@ -27,12 +27,53 @@ def load_settings() -> dict:
     with open(config_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
-@st.cache_data(show_spinner="Loading agronomic dataset...")
+COLUMN_RENAME_MAP = {
+    "Fecha Ing Muestra": "fecha_ing_muestra",
+    "Muestra": "id_muestra",
+    "Carta Camara": "carta_camara",
+    "Fecha de Certificacion": "fecha_de_certificacion",
+    "Certificado": "certificado",
+    "Fecha Factura": "fecha_factura",
+    "PtoVta": "ptovta",
+    "Letra": "letra",
+    "Numero Factura": "numero_factura",
+    "Id": "id_cliente",
+    "Razón Social": "razon_social",
+    "Laboratorios": "laboratorios",
+    "Tipo analisis": "tipo_analisis",
+    "Especies": "especies",
+    "Importe Solicitud": "importe_solicitud",
+}
+
+
+@st.cache_data(show_spinner="Cargando dataset agronómico...")
 def load_agronomic_data() -> pd.DataFrame:
-    """Loads the sample agronomic dataset from data/raw/sample_agro_data.csv."""
+    """Loads and cleans the agronomic dataset from data/raw/sample_agro_data.csv.
+
+    Cleaning steps (ver notebooks/Testeo+practicas_2026.ipynb para el detalle):
+    - Descarta filas completamente vacías (artefacto de exportación del CSV).
+    - Descarta duplicados por número de muestra, conservando el registro más reciente.
+    - Convierte fechas (texto "MM-DD-AA") e importe (texto "$ N.NN") a tipos reales.
+    - Normaliza los nombres de columna a snake_case.
+    """
     data_path = os.path.join(get_base_dir(), "data", "raw", "sample_agro_data.csv")
     if not os.path.exists(data_path):
         return pd.DataFrame()
+
     df = pd.read_csv(data_path)
-    df['fecha'] = pd.to_datetime(df['fecha'])
+    df = df.dropna(subset=["Muestra"]).reset_index(drop=True)
+    df = df.drop_duplicates(subset=["Muestra"], keep="last").reset_index(drop=True)
+
+    columnas_fecha = ["Fecha Ing Muestra", "Fecha de Certificacion", "Fecha Factura"]
+    for col in columnas_fecha:
+        df[col] = pd.to_datetime(df[col], format="%m-%d-%y")
+
+    df["Importe Solicitud"] = (
+        df["Importe Solicitud"].str.replace("$", "", regex=False).str.strip().astype(float)
+    )
+
+    df = df.rename(columns=COLUMN_RENAME_MAP)
+    df["id_muestra"] = df["id_muestra"].astype(int)
+    df["id_cliente"] = df["id_cliente"].astype(int)
+
     return df

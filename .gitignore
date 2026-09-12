@@ -22,6 +22,10 @@ env/
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
+.jupyter_runtime/
+
+# IDE / Agent tools
+.claude/
 
 # OS specific
 .DS_Store
