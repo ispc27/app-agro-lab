@@ -12,6 +12,7 @@ config.yaml
 # Data & Large Files (Security & Repo size)
 data/raw/*
 !data/raw/.gitkeep
+!data/raw/sample_agro_data.csv
 data/processed/*
 !data/processed/.gitkeep
 

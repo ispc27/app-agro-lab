@@ -76,6 +76,16 @@ app-agro-lab/
    streamlit run app.py
    ```
 
+4. **Abrir el dashboard en el navegador**: ingresar a [http://localhost:8501](http://localhost:8501). El navegador no se abre automáticamente porque `.streamlit/config.toml` define `headless = true`.
+
+5. **Iniciar sesión**: usuario `admin`. La contraseña la provee el equipo (en `config.example.yaml` solo se guarda su hash bcrypt).
+
+### Datos incluidos
+
+El dataset `data/raw/sample_agro_data.csv` está versionado en el repositorio, por lo que el dashboard muestra datos apenas se clona el proyecto. Fue generado a partir de `notebooks/BD_lab_28-8-26.xlsx`, con fechas en formato `MM-DD-AA` e importes en formato `$ N.NN`, tal como los espera `load_agronomic_data()`.
+
+Para detener la aplicación, presionar `Ctrl+C` en la terminal donde se está ejecutando.
+
 ---
 
 ## Documentación para Desarrolladores
