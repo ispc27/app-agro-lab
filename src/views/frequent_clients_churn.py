@@ -19,27 +19,37 @@ def render_frequent_clients_churn_view():
         st.warning("No se encontraron muestras para el período seleccionado.")
         return
 
-    # --- Filtros dinámicos: rango de fechas y especie de cultivo ---
+    # --- Filtros dinámicos: fecha desde / hasta y especie, aplicados al confirmar el formulario ---
     fecha_min = df["fecha_ing_muestra"].min().date()
     fecha_max = df["fecha_ing_muestra"].max().date()
+    especies_disponibles = ["Todas"] + sorted(df["especies"].dropna().unique().tolist())
 
-    col_fecha, col_especie = st.columns([2, 1])
-    with col_fecha:
-        rango_fechas = st.date_input(
-            "Rango de fechas",
-            value=(fecha_min, fecha_max),
-            min_value=fecha_min,
-            max_value=fecha_max,
-        )
-    with col_especie:
-        especies_disponibles = ["Todas"] + sorted(df["especies"].dropna().unique().tolist())
-        especie_seleccionada = st.selectbox("Especie de cultivo", especies_disponibles)
+    with st.form("filtros_clientes_frecuentes"):
+        col_desde, col_hasta, col_especie = st.columns(3)
+        with col_desde:
+            fecha_inicio = st.date_input(
+                "Desde",
+                value=fecha_min,
+                min_value=fecha_min,
+                max_value=fecha_max,
+                format="DD/MM/YYYY",
+            )
+        with col_hasta:
+            fecha_fin = st.date_input(
+                "Hasta",
+                value=fecha_max,
+                min_value=fecha_min,
+                max_value=fecha_max,
+                format="DD/MM/YYYY",
+            )
+        with col_especie:
+            especie_seleccionada = st.selectbox("Especie de cultivo", especies_disponibles)
+        st.form_submit_button("Aplicar filtros", icon=":material/filter_alt:")
 
-    if len(rango_fechas) != 2:
-        st.info("Seleccioná un rango de fechas completo (desde / hasta).")
+    if fecha_inicio > fecha_fin:
+        st.error("La fecha Desde no puede ser posterior a la fecha Hasta.")
         return
 
-    fecha_inicio, fecha_fin = rango_fechas
     especie_filtro = None if especie_seleccionada == "Todas" else especie_seleccionada
 
     volumen = calcular_volumen_por_cliente(
