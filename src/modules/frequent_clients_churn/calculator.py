@@ -1,4 +1,27 @@
+from datetime import date
+
 import pandas as pd
+
+
+def calcular_rango_predefinido(
+    fecha_min: date,
+    fecha_max: date,
+    meses: int | None,
+) -> tuple[date, date]:
+    """Calcula el rango (desde, hasta) de los últimos `meses` meses que terminan en fecha_max.
+
+    Args:
+        fecha_min: primera fecha disponible en el dataset; el rango nunca empieza antes.
+        fecha_max: última fecha disponible en el dataset; es el fin del rango.
+        meses: cantidad de meses hacia atrás. None = todo el período disponible.
+
+    Returns:
+        Tupla (desde, hasta) con fechas inclusivas.
+    """
+    if meses is None:
+        return fecha_min, fecha_max
+    desde = (pd.Timestamp(fecha_max) - pd.DateOffset(months=meses)).date()
+    return max(desde, fecha_min), fecha_max
 
 
 def calcular_volumen_por_cliente(
