@@ -96,23 +96,30 @@ def apply_enterprise_theme():
             margin-bottom: 4px !important;
         }
 
-        /* Enterprise Metric Cards */
+        /* Enterprise Metric Cards Styling */
         [data-testid="stMetric"] {
-            background-color: #F8FAFC;
-            border: 1px solid #E2E8F0;
-            border-radius: 8px;
-            padding: 14px 18px;
+            background-color: #F8FAFC !important;
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 8px !important;
+            padding: 16px 20px !important;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02) !important;
         }
 
-        [data-testid="stMetricValue"] {
-            color: #0F172A !important;
-            font-weight: 600;
+        [data-testid="stMetricValue"],
+        [data-testid="stMetricValue"] * {
+            color: #111827 !important;
+            font-size: 1.55rem !important;
+            font-weight: 700 !important;
+            line-height: 1.2 !important;
         }
 
-        [data-testid="stMetricLabel"] {
+        [data-testid="stMetricLabel"],
+        [data-testid="stMetricLabel"] * {
             color: #64748B !important;
-            font-size: 0.875rem;
-            font-weight: 500;
+            font-size: 0.8rem !important;
+            font-weight: 600 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
         }
         
         /* Dividers */

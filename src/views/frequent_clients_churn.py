@@ -1,41 +1,48 @@
+import plotly.express as px
 import streamlit as st
 from src.components.theme import render_header
 from src.config.settings import load_agronomic_data
 from src.modules.frequent_clients_churn import (
-    calcular_volumen_por_cliente,
-    calcular_alerta_churn_estacional,
-    calcular_rango_predefinido,
+    compute_predefined_date_range,
+    compute_volume_by_client,
+    detect_seasonal_churn_alerts,
 )
 
-RANGOS_PREDEFINIDOS = {
+MONTH_NAMES_ES = {
+    1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
+    5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
+    9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
+}
+
+PREDEFINED_RANGES = {
     "Últimos 3 meses": 3,
     "Últimos 6 meses": 6,
     "Último año": 12,
     "Todo el período": None,
 }
-KEY_RANGO = "clientes_frecuentes_rango"
-KEY_DESDE = "clientes_frecuentes_desde"
-KEY_HASTA = "clientes_frecuentes_hasta"
+KEY_RANGE = "frequent_clients_range"
+KEY_FROM = "frequent_clients_from"
+KEY_TO = "frequent_clients_to"
 
 
-def _aplicar_rango_predefinido(fecha_min, fecha_max):
-    """Carga en Desde/Hasta el rango del acceso rápido seleccionado."""
-    rango = st.session_state.get(KEY_RANGO)
-    if rango is None:
+def _apply_predefined_range(min_date, max_date):
+    """Loads the start/end dates for the selected quick-select period."""
+    selected_range = st.session_state.get(KEY_RANGE)
+    if selected_range is None:
         return
-    desde, hasta = calcular_rango_predefinido(fecha_min, fecha_max, RANGOS_PREDEFINIDOS[rango])
-    st.session_state[KEY_DESDE] = desde
-    st.session_state[KEY_HASTA] = hasta
+    start_date, end_date = compute_predefined_date_range(min_date, max_date, PREDEFINED_RANGES[selected_range])
+    st.session_state[KEY_FROM] = start_date
+    st.session_state[KEY_TO] = end_date
 
 
-def _desmarcar_rango_si_cambio(fecha_min, fecha_max):
-    """Quita la selección del acceso rápido si las fechas aplicadas ya no coinciden con él."""
-    rango = st.session_state.get(KEY_RANGO)
-    if rango is None:
+def _uncheck_range_on_change(min_date, max_date):
+    """Deselects the quick-select option if custom dates no longer match it."""
+    selected_range = st.session_state.get(KEY_RANGE)
+    if selected_range is None:
         return
-    esperado = calcular_rango_predefinido(fecha_min, fecha_max, RANGOS_PREDEFINIDOS[rango])
-    if (st.session_state[KEY_DESDE], st.session_state[KEY_HASTA]) != esperado:
-        st.session_state[KEY_RANGO] = None
+    expected = compute_predefined_date_range(min_date, max_date, PREDEFINED_RANGES[selected_range])
+    if (st.session_state.get(KEY_FROM), st.session_state.get(KEY_TO)) != expected:
+        st.session_state[KEY_RANGE] = None
 
 
 def render_frequent_clients_churn_view():
@@ -50,93 +57,202 @@ def render_frequent_clients_churn_view():
         st.warning("No se encontraron muestras para el período seleccionado.")
         return
 
-    # --- Filtros dinámicos: accesos rápidos de período, fecha desde / hasta y especie ---
-    fecha_min = df["fecha_ing_muestra"].min().date()
-    fecha_max = df["fecha_ing_muestra"].max().date()
-    especies_disponibles = ["Todas"] + sorted(df["especies"].dropna().unique().tolist())
+    # --- Dynamic Filters ---
+    min_date = df["fecha_ing_muestra"].min().date()
+    max_date = df["fecha_ing_muestra"].max().date()
+    available_species = ["Todas"] + sorted(df["especies"].dropna().unique().tolist())
 
-    st.session_state.setdefault(KEY_RANGO, "Todo el período")
-    st.session_state.setdefault(KEY_DESDE, fecha_min)
-    st.session_state.setdefault(KEY_HASTA, fecha_max)
+    st.session_state.setdefault(KEY_RANGE, "Todo el período")
+    st.session_state.setdefault(KEY_FROM, min_date)
+    st.session_state.setdefault(KEY_TO, max_date)
 
     st.segmented_control(
         "Período",
-        options=list(RANGOS_PREDEFINIDOS),
-        key=KEY_RANGO,
-        on_change=_aplicar_rango_predefinido,
-        args=(fecha_min, fecha_max),
-        help=f"Los rangos se calculan hasta el último ingreso registrado ({fecha_max:%d/%m/%Y}).",
+        options=list(PREDEFINED_RANGES),
+        key=KEY_RANGE,
+        on_change=_apply_predefined_range,
+        args=(min_date, max_date),
+        help=f"Los rangos se calculan hasta el último ingreso registrado ({max_date:%d/%m/%Y}).",
     )
 
-    with st.form("filtros_clientes_frecuentes"):
-        col_desde, col_hasta, col_especie = st.columns(3)
-        with col_desde:
-            fecha_inicio = st.date_input(
-                "Desde",
-                key=KEY_DESDE,
-                min_value=fecha_min,
-                max_value=fecha_max,
-                format="DD/MM/YYYY",
-            )
-        with col_hasta:
-            fecha_fin = st.date_input(
-                "Hasta",
-                key=KEY_HASTA,
-                min_value=fecha_min,
-                max_value=fecha_max,
-                format="DD/MM/YYYY",
-            )
-        with col_especie:
-            especie_seleccionada = st.selectbox("Especie de cultivo", especies_disponibles)
-        st.form_submit_button(
-            "Aplicar filtros",
-            icon=":material/filter_alt:",
-            on_click=_desmarcar_rango_si_cambio,
-            args=(fecha_min, fecha_max),
+    col_from, col_to, col_species, col_convenio = st.columns([1, 1, 1, 1])
+    with col_from:
+        start_date_input = st.date_input(
+            "Desde",
+            key=KEY_FROM,
+            min_value=min_date,
+            max_value=max_date,
+            format="DD/MM/YYYY",
+            on_change=_uncheck_range_on_change,
+            args=(min_date, max_date),
         )
+    with col_to:
+        end_date_input = st.date_input(
+            "Hasta",
+            key=KEY_TO,
+            min_value=min_date,
+            max_value=max_date,
+            format="DD/MM/YYYY",
+            on_change=_uncheck_range_on_change,
+            args=(min_date, max_date),
+        )
+    with col_species:
+        selected_species = st.selectbox("Especie de cultivo", available_species)
+    with col_convenio:
+        exclude_agreements = st.checkbox("Excluir convenios (ID > 50.000)", value=False)
 
-    if fecha_inicio > fecha_fin:
+    if start_date_input > end_date_input:
         st.error("La fecha Desde no puede ser posterior a la fecha Hasta.")
         return
 
-    especie_filtro = None if especie_seleccionada == "Todas" else especie_seleccionada
+    species_filter = None if selected_species == "Todas" else selected_species
 
-    volumen = calcular_volumen_por_cliente(
+    volume_df = compute_volume_by_client(
         df,
-        fecha_inicio=fecha_inicio,
-        fecha_fin=fecha_fin,
-        especie=especie_filtro,
+        start_date=start_date_input,
+        end_date=end_date_input,
+        crop_species=species_filter,
+        exclude_agreements=exclude_agreements,
     )
 
-    if volumen.empty:
+    if volume_df.empty:
         st.info("No se encontraron muestras para el período y/o especie seleccionados.")
         return
 
-    # --- KPIs resumen ---
+    # --- Summary KPIs ---
     col1, col2, col3 = st.columns(3)
-    col1.metric("Clientes con envíos", f"{volumen.shape[0]:,}".replace(",", "."))
-    col2.metric("Total de muestras", f"{volumen['total_muestras'].sum():,}".replace(",", "."))
-    col3.metric("Cliente líder (Id)", str(volumen.iloc[0]["id_cliente"]))
+    col1.metric("Clientes con envíos", f"{volume_df.shape[0]:,}".replace(",", "."))
+    col2.metric("Total de muestras", f"{volume_df['total_muestras'].sum():,}".replace(",", "."))
+    leader_name = (
+        f"{volume_df.iloc[0]['razon_social']} (Id: {volume_df.iloc[0]['id_cliente']})"
+        if "razon_social" in volume_df.columns
+        else str(volume_df.iloc[0]["id_cliente"])
+    )
+    col3.metric("Cliente líder", leader_name)
 
-    st.markdown("#### Clientes ordenados por volumen de muestras")
-    st.dataframe(volumen, use_container_width=True, hide_index=True)
+    st.markdown("---")
 
-    # --- Alerta de Churn Estacional ---
-    st.markdown("#### Alerta de Churn Estacional")
-    st.caption(
-        "Clientes cuyo volumen de envío en el mes actual es 0% respecto a su promedio "
-        "histórico para la misma época del año."
+    # --- Top 10 Plotly Chart ---
+    st.markdown("#### Top 10 Clientes por Volumen de Muestras")
+    top_10_df = volume_df.head(10).sort_values("total_muestras", ascending=True).copy()
+    
+    def _format_client_label(row):
+        rz = str(row.get("razon_social", "")).strip()
+        cid = row["id_cliente"]
+        if rz and rz.upper() not in ["NN", "NAN", "NONE"]:
+            return f"{rz} (ID: {cid})"
+        return f"Cliente {cid}"
+
+    top_10_df["cliente_label"] = top_10_df.apply(_format_client_label, axis=1)
+    
+    fig = px.bar(
+        top_10_df,
+        x="total_muestras",
+        y="cliente_label",
+        orientation="h",
+        text="total_muestras",
+        labels={"total_muestras": "Cantidad de Muestras", "cliente_label": "Cliente"},
+        color_discrete_sequence=["#111827"],
+    )
+    fig.update_layout(
+        font=dict(family="Poppins"),
+        showlegend=False,
+        height=380,
+        margin=dict(l=110, r=40, t=30, b=20),
+        xaxis_title="Volumen de Muestras",
+        yaxis_title=None,
+        coloraxis_showscale=False,
+    )
+    fig.update_traces(textposition="outside")
+    st.plotly_chart(fig, use_container_width=True)
+
+    # --- Detailed Client Table ---
+    st.markdown("#### Tabla Completa de Clientes Ordenada por Volumen")
+    
+    column_config = {
+        "id_cliente": st.column_config.NumberColumn(
+            "ID Cliente",
+            format="%d",
+            help="Identificador único de la cuenta",
+        ),
+        "razon_social": st.column_config.TextColumn(
+            "Razón Social",
+            help="Nombre del cliente o entidad",
+        ),
+        "total_muestras": st.column_config.NumberColumn(
+            "Total Muestras",
+            format="%d",
+            help="Volumen total de muestras recibidas",
+        ),
+        "porcentaje_total": st.column_config.NumberColumn(
+            "% del Total",
+            format="%.2f %%",
+            help="Porcentaje de participación sobre el total de muestras",
+        ),
+    }
+    
+    st.dataframe(
+        volume_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config=column_config,
     )
 
-    alertas = calcular_alerta_churn_estacional(df)
-    clientes_en_alerta = alertas[alertas["alerta_churn_estacional"]]
+    st.markdown("---")
 
-    if clientes_en_alerta.empty:
-        st.success("No hay clientes en alerta de churn estacional para el mes actual.")
+    # --- Seasonal Churn Alert ---
+    st.markdown("#### Alerta de Churn Estacional")
+    st.caption(
+        "Identificación de clientes cuyo volumen de envío en el mes seleccionado es 0% respecto a su promedio "
+        "histórico para la misma época del año (mismo mes calendario)."
+    )
+
+    col_month, _ = st.columns([2, 2])
+    with col_month:
+        default_month = max_date.month
+        selected_month_num = st.selectbox(
+            "Mes de análisis estacional",
+            options=list(MONTH_NAMES_ES.keys()),
+            format_func=lambda m: MONTH_NAMES_ES[m],
+            index=default_month - 1,
+            help="Seleccione el mes calendario para evaluar la recencia histórica de envíos.",
+        )
+
+    alert_df = detect_seasonal_churn_alerts(
+        df,
+        reference_month=selected_month_num,
+        exclude_agreements=exclude_agreements,
+    )
+    alert_clients = alert_df[alert_df["alerta_churn_estacional"]].copy()
+
+    month_label = MONTH_NAMES_ES[selected_month_num]
+
+    if alert_clients.empty:
+        st.success(f"No hay clientes en alerta de churn estacional para el mes de {month_label}.")
     else:
-        st.warning(f"{clientes_en_alerta.shape[0]} cliente(s) en alerta de churn estacional.")
+        st.warning(f"{alert_clients.shape[0]} cliente(s) detectado(s) en alerta de churn estacional para {month_label}.")
+        
+        at_risk_vol = alert_clients["promedio_historico_mismo_mes"].sum()
+        
+        kpi_col1, kpi_col2 = st.columns(2)
+        kpi_col1.metric(f"Clientes Inactivos en {month_label}", str(alert_clients.shape[0]))
+        kpi_col2.metric("Volumen Histórico Promedio en Riesgo (Muestras)", f"{at_risk_vol:.1f}")
+
+        alert_clients["estado"] = "[Alerta Churn 0%]"
+        
+        alert_column_config = {
+            "id_cliente": st.column_config.NumberColumn("ID Cliente", format="%d"),
+            "razon_social": st.column_config.TextColumn("Razón Social"),
+            "volumen_actual": st.column_config.NumberColumn("Volumen Actual (Mes)", format="%d"),
+            "promedio_historico_mismo_mes": st.column_config.NumberColumn("Promedio Histórico (Mismo Mes)", format="%.1f"),
+            "estado": st.column_config.TextColumn("Estado de Alerta"),
+        }
+        
+        show_cols = [c for c in ["id_cliente", "razon_social", "volumen_actual", "promedio_historico_mismo_mes", "estado"] if c in alert_clients.columns]
+        
         st.dataframe(
-            clientes_en_alerta[["id_cliente", "volumen_actual", "promedio_historico_mismo_mes"]],
+            alert_clients[show_cols],
             use_container_width=True,
             hide_index=True,
+            column_config=alert_column_config,
         )

@@ -1,16 +1,8 @@
-import os
-
 import plotly.express as px
 import streamlit as st
 from src.components.theme import render_header
-from src.config.settings import get_base_dir, load_agronomic_data
-from src.modules.rfm_segmentation import cargar_ipc, calcular_importe_real, calcular_rfm
-
-
-@st.cache_data(show_spinner="Actualizando índice de inflación (INDEC)...")
-def _cargar_ipc_cacheado():
-    ruta_backup = os.path.join(get_base_dir(), "data", "raw", "ipc_indec_mensual.csv")
-    return cargar_ipc(ruta_backup_local=ruta_backup)
+from src.config.settings import load_agronomic_data, load_ipc_data
+from src.modules.rfm_segmentation import adjust_real_amounts, compute_rfm_score
 
 
 def render_rfm_segmentation_view():
@@ -25,67 +17,113 @@ def render_rfm_segmentation_view():
         st.warning("No se encontraron muestras para el período seleccionado.")
         return
 
-    ipc = _cargar_ipc_cacheado()
-    if ipc is None:
-        st.info(
-            "No se pudo obtener el IPC del INDEC (sin conexión y sin respaldo local). "
-            "El Valor Monetario se calcula con importes nominales, sin ajustar por inflación."
-        )
-    df = calcular_importe_real(df, ipc)
+    # Attempt to load IPC data if available, without forcing network calls if offline
+    ipc_df = load_ipc_data()
+    df = adjust_real_amounts(df, ipc_df)
 
-    rfm = calcular_rfm(df, excluir_convenio=True)
+    # Compute RFM scoring excluding corporate agreements (id_cliente > 50,000)
+    rfm_df = compute_rfm_score(df, exclude_agreements=True)
 
-    # --- KPIs ---
+    # --- Summary KPIs ---
+    at_risk_count = int(rfm_df["en_riesgo"].sum())
+    at_risk_value = rfm_df.loc[rfm_df["en_riesgo"], "valor_monetario"].sum()
+
     col1, col2, col3 = st.columns(3)
-    col1.metric("Clientes segmentados", f"{rfm.shape[0]:,}".replace(",", "."))
-    col2.metric("Clientes En Riesgo", int(rfm["en_riesgo"].sum()))
-    col3.metric(
-        "Valor Monetario en riesgo",
-        f"${rfm.loc[rfm['en_riesgo'], 'valor_monetario'].sum():,.0f}".replace(",", "."),
-    )
+    col1.metric("Clientes Segmentados", f"{rfm_df.shape[0]:,}".replace(",", "."))
+    col2.metric("Clientes En Riesgo de Fuga", f"{at_risk_count:,}".replace(",", "."))
+    col3.metric("Valor Monetario en Riesgo", f"${at_risk_value:,.0f}".replace(",", "."))
 
-    # --- Distribución de scores RFM ---
-    st.markdown("#### Distribución de Scores RFM")
-    distribucion_scores = rfm["rfm_score"].value_counts().reset_index()
-    distribucion_scores.columns = ["rfm_score", "cantidad_clientes"]
+    st.markdown("---")
+
+    # --- RFM Score Distribution ---
+    st.markdown("#### Distribución de Scores RFM (Recencia - Frecuencia - Monetario)")
+    st.caption("Puntajes de 3 dígitos (del 111 al 555) calculados mediante quintiles. R5=Más reciente, F5=Más muestras, M5=Mayor valor.")
+    
+    score_distribution = rfm_df["rfm_score"].value_counts().reset_index()
+    score_distribution.columns = ["rfm_score", "cantidad_clientes"]
+    
     fig = px.bar(
-        distribucion_scores.sort_values("rfm_score"),
+        score_distribution.sort_values("rfm_score"),
         x="rfm_score",
         y="cantidad_clientes",
+        text="cantidad_clientes",
         color_discrete_sequence=["#111827"],
+        labels={"rfm_score": "Score RFM (R-F-M)", "cantidad_clientes": "Cantidad de Clientes"},
     )
     fig.update_xaxes(type="category")
-    fig.update_layout(xaxis_title="Score RFM (R-F-M)", yaxis_title="Clientes", margin=dict(t=10))
+    fig.update_traces(textposition="outside")
+    fig.update_layout(
+        font=dict(family="Poppins"),
+        xaxis_title="Score RFM (3 dígitos)",
+        yaxis_title="Cantidad de Clientes",
+        margin=dict(t=30, b=20),
+        height=380,
+    )
     st.plotly_chart(fig, use_container_width=True)
 
-    # --- Alerta: clientes En Riesgo (listado prioritario) ---
-    st.markdown("#### Alerta de Fuga: clientes En Riesgo")
+    st.markdown("---")
+
+    # --- Churn Risk Alert Table (Priority Commercial List) ---
+    st.markdown("#### Alerta de Fuga: Listado Prioritario de Clientes En Riesgo")
     st.caption(
-        "Baja Recencia (quintil 1-2) combinada con Alta Frecuencia o Alto Valor histórico "
-        "(quintil 4-5): eran buenos clientes y dejaron de operar recientemente."
+        "Cuentas con Baja Recencia (quintil R 1 o 2) pero Alta Frecuencia o Alto Valor histórico (quintiles F o M 4 o 5). "
+        "Eran clientes estratégicos que han dejado de operar recientemente."
     )
 
-    en_riesgo = rfm[rfm["en_riesgo"]].copy()
-    if en_riesgo.empty:
-        st.success("No hay clientes en alerta de fuga con los datos actuales.")
+    at_risk_df = rfm_df[rfm_df["en_riesgo"]].copy()
+    if at_risk_df.empty:
+        st.success("No se registran clientes en alerta de fuga con los parámetros actuales.")
     else:
-        st.warning(f"{en_riesgo.shape[0]} cliente(s) en alerta de fuga — listado prioritario para gestión comercial.")
-        en_riesgo["valor_monetario"] = en_riesgo["valor_monetario"].round(0)
-        en_riesgo_mostrar = en_riesgo[
-            ["id_cliente", "recencia", "frecuencia", "valor_monetario", "rfm_score"]
-        ].rename(columns={
-            "id_cliente": "Cliente (Id)",
-            "recencia": "Días sin operar",
-            "frecuencia": "Muestras históricas",
-            "valor_monetario": "Valor histórico ($)",
-            "rfm_score": "Score RFM",
-        })
-        st.dataframe(en_riesgo_mostrar, use_container_width=True, hide_index=True)
+        st.warning(f"{at_risk_df.shape[0]} cliente(s) prioritario(s) detectado(s) en alerta de fuga.")
+        
+        at_risk_df["estado"] = "[En Riesgo]"
+        at_risk_df["valor_monetario"] = at_risk_df["valor_monetario"].round(0)
+        
+        column_config_risk = {
+            "id_cliente": st.column_config.NumberColumn("ID Cliente", format="%d"),
+            "razon_social": st.column_config.TextColumn("Razón Social"),
+            "recencia": st.column_config.NumberColumn("Días Inactivo", format="%d días"),
+            "frecuencia": st.column_config.NumberColumn("Muestras Históricas", format="%d"),
+            "valor_monetario": st.column_config.NumberColumn("Valor Histórico ($)", format="$ %d"),
+            "rfm_score": st.column_config.TextColumn("Score RFM"),
+            "estado": st.column_config.TextColumn("Estado de Alerta"),
+        }
+        
+        show_cols = [c for c in ["id_cliente", "razon_social", "recencia", "frecuencia", "valor_monetario", "rfm_score", "estado"] if c in at_risk_df.columns]
+        
+        st.dataframe(
+            at_risk_df[show_cols],
+            use_container_width=True,
+            hide_index=True,
+            column_config=column_config_risk,
+        )
 
-    # --- Tabla completa ---
-    with st.expander("Ver segmentación RFM completa (todos los clientes)"):
-        rfm_mostrar = rfm[
-            ["id_cliente", "recencia", "frecuencia", "valor_monetario", "R", "F", "M", "rfm_score", "en_riesgo"]
-        ].copy()
-        rfm_mostrar["valor_monetario"] = rfm_mostrar["valor_monetario"].round(0)
-        st.dataframe(rfm_mostrar, use_container_width=True, hide_index=True)
+    st.markdown("---")
+
+    # --- Full RFM Table ---
+    with st.expander("Ver Segmentación RFM Completa (Todos los Clientes)"):
+        full_rfm_display = rfm_df.copy()
+        full_rfm_display["valor_monetario"] = full_rfm_display["valor_monetario"].round(0)
+        full_rfm_display["estado"] = full_rfm_display["en_riesgo"].apply(lambda x: "[En Riesgo]" if x else "[Saludable]")
+        
+        full_column_config = {
+            "id_cliente": st.column_config.NumberColumn("ID Cliente", format="%d"),
+            "razon_social": st.column_config.TextColumn("Razón Social"),
+            "recencia": st.column_config.NumberColumn("Días Inactivo", format="%d días"),
+            "frecuencia": st.column_config.NumberColumn("Total Muestras", format="%d"),
+            "valor_monetario": st.column_config.NumberColumn("Valor Total ($)", format="$ %d"),
+            "R": st.column_config.NumberColumn("Quintil R", format="%d"),
+            "F": st.column_config.NumberColumn("Quintil F", format="%d"),
+            "M": st.column_config.NumberColumn("Quintil M", format="%d"),
+            "rfm_score": st.column_config.TextColumn("Score RFM"),
+            "estado": st.column_config.TextColumn("Estado Segmento"),
+        }
+        
+        full_cols = [c for c in ["id_cliente", "razon_social", "recencia", "frecuencia", "valor_monetario", "R", "F", "M", "rfm_score", "estado"] if c in full_rfm_display.columns]
+        
+        st.dataframe(
+            full_rfm_display[full_cols],
+            use_container_width=True,
+            hide_index=True,
+            column_config=full_column_config,
+        )
