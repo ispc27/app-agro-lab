@@ -5,7 +5,7 @@ import streamlit as st
 # Allow imports from project root directory
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from src.core.auth import render_login_form
+from src.core.auth import render_login_form, has_permission
 from src.components.sidebar import render_sidebar
 from src.components.theme import apply_enterprise_theme
 from src.views.frequent_clients_churn import render_frequent_clients_churn_view
@@ -28,12 +28,21 @@ else:
     # Render Corporate Sidebar & get active module selection
     selected_page_id = render_sidebar()
 
-    # Dynamic routing according to selected module
+    # Dynamic routing according to selected module & role permissions
     if selected_page_id == "frequent_clients_churn":
-        render_frequent_clients_churn_view()
+        if has_permission(["admin", "responsable_laboratorio", "responsable_rrii"]):
+            render_frequent_clients_churn_view()
+        else:
+            st.error("No tienes permisos suficientes para acceder al módulo de Clientes y Churn.")
     elif selected_page_id == "crop_capacity":
-        render_crop_capacity_view()
+        if has_permission(["admin", "responsable_laboratorio", "analista_laboratorio"]):
+            render_crop_capacity_view()
+        else:
+            st.error("No tienes permisos suficientes para acceder al módulo de Cultivos y Capacidad.")
     elif selected_page_id == "rfm_segmentation":
-        render_rfm_segmentation_view()
+        if has_permission(["admin", "responsable_rrii", "comercial"]):
+            render_rfm_segmentation_view()
+        else:
+            st.error("No tienes permisos suficientes para acceder al módulo de Segmentación RFM.")
     else:
-        render_frequent_clients_churn_view()
+        st.info("Seleccione un módulo válido desde la barra lateral.")

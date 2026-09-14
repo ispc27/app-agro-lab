@@ -46,34 +46,76 @@ COLUMN_RENAME_MAP = {
 }
 
 
-@st.cache_data(show_spinner="Cargando dataset agronómico...")
+@st.cache_data(show_spinner="Cargando y procesando dataset agronómico (ETL)...")
 def load_agronomic_data() -> pd.DataFrame:
-    """Loads and cleans the agronomic dataset from data/raw/sample_agro_data.csv.
+    """Loads, cleans, and transforms the agronomic dataset (CRISP-DM ETL Pipeline).
 
-    Cleaning steps (ver notebooks/Testeo+practicas_2026.ipynb para el detalle):
-    - Descarta filas completamente vacías (artefacto de exportación del CSV).
-    - Descarta duplicados por número de muestra, conservando el registro más reciente.
-    - Convierte fechas (texto "MM-DD-AA") e importe (texto "$ N.NN") a tipos reales.
-    - Normaliza los nombres de columna a snake_case.
+    Sources supported:
+    1. Primary Processed: data/processed/cleaned_agro_data.csv
+    2. Primary Raw: data/raw/BD_lab_28-8-26.xlsx (Sheet 'Export')
     """
-    data_path = os.path.join(get_base_dir(), "data", "raw", "sample_agro_data.csv")
-    if not os.path.exists(data_path):
+    base_dir = get_base_dir()
+    processed_path = os.path.join(base_dir, "data", "processed", "cleaned_agro_data.csv")
+    excel_path = os.path.join(base_dir, "data", "raw", "BD_lab_28-8-26.xlsx")
+
+    if os.path.exists(processed_path):
+        df = pd.read_csv(processed_path)
+        date_cols = ["fecha_ing_muestra", "fecha_de_certificacion", "fecha_factura"]
+        for col in date_cols:
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col], errors="coerce")
+        df["id_muestra"] = df["id_muestra"].astype(int)
+        df["id_cliente"] = df["id_cliente"].astype(int)
+        return df
+
+    if os.path.exists(excel_path):
+        df = pd.read_excel(excel_path, sheet_name=0)
+    else:
         return pd.DataFrame()
 
-    df = pd.read_csv(data_path)
-    df = df.dropna(subset=["Muestra"]).reset_index(drop=True)
+    # Drop null rows in critical identifier columns
+    df = df.dropna(subset=["Muestra", "Id"]).reset_index(drop=True)
+
+    # Remove sample duplicates, keeping the latest entry
     df = df.drop_duplicates(subset=["Muestra"], keep="last").reset_index(drop=True)
 
+    # Parse date columns to datetime64[ns]
     columnas_fecha = ["Fecha Ing Muestra", "Fecha de Certificacion", "Fecha Factura"]
     for col in columnas_fecha:
-        df[col] = pd.to_datetime(df[col], format="%m-%d-%y")
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors="coerce")
 
-    df["Importe Solicitud"] = (
-        df["Importe Solicitud"].str.replace("$", "", regex=False).str.strip().astype(float)
-    )
+    # Clean and convert Importe Solicitud to float
+    if "Importe Solicitud" in df.columns:
+        if df["Importe Solicitud"].dtype == object:
+            df["Importe Solicitud"] = (
+                df["Importe Solicitud"]
+                .astype(str)
+                .str.replace("$", "", regex=False)
+                .str.strip()
+                .astype(float)
+            )
+        else:
+            df["Importe Solicitud"] = df["Importe Solicitud"].astype(float)
 
+    # Rename columns to snake_case
     df = df.rename(columns=COLUMN_RENAME_MAP)
+
+    # Integer type casting for IDs
     df["id_muestra"] = df["id_muestra"].astype(int)
     df["id_cliente"] = df["id_cliente"].astype(int)
 
+    # Save processed backup CSV for auditing
+    processed_dir = os.path.join(base_dir, "data", "processed")
+    os.makedirs(processed_dir, exist_ok=True)
+    df.to_csv(os.path.join(processed_dir, "cleaned_agro_data.csv"), index=False)
+
     return df
+
+
+@st.cache_data(show_spinner="Actualizando índice de inflación (INDEC)...")
+def load_ipc_data() -> pd.DataFrame | None:
+    """Loads national IPC inflation index (INDEC), using local backup if network is unavailable."""
+    from src.modules.rfm_segmentation.calculator import fetch_ipc_inflation_index
+    local_backup = os.path.join(get_base_dir(), "data", "raw", "ipc_indec_mensual.csv")
+    return fetch_ipc_inflation_index(local_backup_path=local_backup)

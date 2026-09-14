@@ -1,11 +1,12 @@
 import streamlit as st
+from src.core.auth import has_permission
 from src.core.session import get_current_user, logout
 
 def render_sidebar() -> str:
     """Renders the corporate sidebar component:
     1. Top Brand Header (AGROLAB)
     2. Left-aligned Profile Section (Avatar container + Name + Role Badge)
-    3. Vertical Navigation Modules list (Modulo 1)
+    3. Vertical Navigation Modules list (Filtered by Role Permissions)
     4. Logout button anchored to bottom of flex wrapper
     """
     user = get_current_user()
@@ -244,14 +245,37 @@ def render_sidebar() -> str:
         unsafe_allow_html=True
     )
 
-    # 3. Navigation Modules list
-    modules = [
-        {"id": "frequent_clients_churn", "label": "Clientes y Churn", "icon": ":material/group:"},
-        {"id": "crop_capacity", "label": "Cultivos y Capacidad", "icon": ":material/show_chart:"},
-        {"id": "rfm_segmentation", "label": "Segmentación RFM", "icon": ":material/analytics:"}
+    # 3. Navigation Modules list with RBAC Filtering
+    all_modules = [
+        {
+            "id": "frequent_clients_churn",
+            "label": "Clientes y Churn",
+            "icon": ":material/group:",
+            "roles": ["admin", "responsable_laboratorio", "responsable_rrii"],
+        },
+        {
+            "id": "crop_capacity",
+            "label": "Cultivos y Capacidad",
+            "icon": ":material/show_chart:",
+            "roles": ["admin", "responsable_laboratorio", "analista_laboratorio"],
+        },
+        {
+            "id": "rfm_segmentation",
+            "label": "Segmentación RFM",
+            "icon": ":material/analytics:",
+            "roles": ["admin", "responsable_rrii", "comercial"],
+        },
     ]
 
-    # Initialize active module state
+    modules = [m for m in all_modules if has_permission(m["roles"])]
+
+    if not modules:
+        st.sidebar.warning("No tienes módulos asignados para tu rol.")
+        if st.sidebar.button("Cerrar Sesión", key="sidebar_logout_btn_empty", icon=":material/logout:"):
+            logout()
+        return ""
+
+    # Initialize active module state to the first authorized module if current selection is invalid
     allowed_ids = [m["id"] for m in modules]
     if "active_module_id" not in st.session_state or st.session_state["active_module_id"] not in allowed_ids:
         st.session_state["active_module_id"] = allowed_ids[0]
