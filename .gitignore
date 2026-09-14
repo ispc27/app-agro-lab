@@ -9,12 +9,13 @@ config.yaml
 !config.example.yaml
 .streamlit/secrets.toml
 
-# Data & Large Files (Security & Repo size)
+# Data & Processed Datasets
 data/raw/*
 !data/raw/.gitkeep
-!data/raw/sample_agro_data.csv
+!data/raw/BD_lab_28-8-26.xlsx
 data/processed/*
 !data/processed/.gitkeep
+!data/processed/cleaned_agro_data.csv
 
 # Virtual environments
 venv/
@@ -27,6 +28,8 @@ env/
 
 # IDE / Agent tools
 .claude/
+.gemini/
+scratch/
 
 # OS specific
 .DS_Store
