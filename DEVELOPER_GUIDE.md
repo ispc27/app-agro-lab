@@ -21,7 +21,7 @@ flowchart TD
 
 ### Matriz de Responsabilidad por Capa
 
-1. **`data/raw/`**: Contiene los datasets originales e inmutables (`sample_agro_data.csv`).
+1. **`data/raw/`**: Contiene los datasets originales e inmutables (`BD_lab_28-8-26.xlsx` y `sample_agro_data.csv`). El diccionario formal de variables se documenta en [DATA_DICTIONARY.md](file:///C:/Users/Juan/Desktop/app-agro-lab/DATA_DICTIONARY.md).
 2. **`notebooks/`**: Sandbox para Análisis Exploratorio de Datos (EDA) y prototipado de cálculos y gráficos.
 3. **`src/config/`**: Configuración del sistema (`settings.py`), resolución de rutas absolutas y carga en caché de datos con `@st.cache_data`.
 4. **`src/core/`**: Infraestructura de seguridad (`auth.py` para autenticación RBAC con bcrypt y `session.py` para el ciclo de vida de la sesión).
