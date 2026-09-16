@@ -1,37 +1,42 @@
 # AgroLab — Plataforma de Análisis y Analítica Agronómica
 
-Plataforma corporativa e interactiva para el análisis de datos agronómicos, monitoreo de capacidad operativa de laboratorios, detección de churn estacional y segmentación comercial de cuentas basada en la metodología **CRISP-DM** y una **Arquitectura Limpia en 5 Capas**.
+Plataforma corporativa e interactiva para el análisis de datos agronómicos, monitoreo de capacidad operativa de laboratorios, análisis de estacionalidad y segmentación comercial de cuentas basada en la metodología **CRISP-DM** y una **Arquitectura Limpia en 5 Capas**.
 
 ---
 
-## 📋 Módulos Analíticos e Historias de Usuario
+## Módulos Analíticos e Historias de Usuario
 
 La plataforma se estructura en tres áreas analíticas protegidas por **Control de Acceso Basado en Roles (RBAC)**:
 
-### 1. Clientes Frecuentes y Churn Estacional (HU-01)
+### 1. Identificación de Clientes Frecuentes (HU-01 / Objetivo 1)
 - **Roles autorizados**: `admin`, `responsable_laboratorio`, `responsable_rrii`.
-- Ranking interactivo de cuentas ordenadas por volumen de muestras recibidas.
-- Filtros dinámicos reactivos por rango de fechas (3 meses, 6 meses, 1 año, Todo) y especie de cultivo.
-- Detección de **alertas de Churn estacional** (clientes cuyo volumen en el mes seleccionado es 0% respecto a su promedio histórico del mismo mes).
-- Opción para filtrar u omitir cuentas de convenio (`id_cliente > 50.000`).
+- Ranking interactivo de clientes ordenados descendentemente por volumen de muestras ingresadas en el período.
+- Filtros dinámicos superiores: Presets rápidos de fechas (*Todo el Histórico*, *Ciclo 25/26*, *Último Año*, *Últimos 6 Meses*, *Personalizado*) con selectores de fecha `Desde` / `Hasta` (`DD/MM/YYYY`).
+- **Filtro Multi-Especie** (`st.multiselect`): Permite filtrar por una, varias o todas las especies simultáneamente.
+- **Filtro de Estado de Cuenta**: `Activos` (cuentas con envíos en la ventana), `Inactivos` (cuentas históricas sin envíos) o `Todos`.
+- Opción para excluir cuentas de convenio institucional (`id_cliente > 50.000`).
+- Top 10 interactivo en gráfico de barras horizontales y tabla completa con buscador en vivo por ID o Razón Social y formateo Styler.
 
-### 2. Cultivos y Capacidad Operativa (HU-02)
+### 2. Demanda, Estacionalidad y Capacidad Operativa (HU-02 / Objetivos 2 y 3)
 - **Roles autorizados**: `admin`, `responsable_laboratorio`, `analista_laboratorio`.
-- KPI de muestras acumuladas 100% coincidente con la suma de la distribución por especie.
-- Selector alternable entre gráfico de Barras de Pareto y gráfico de Torta/Dona (Top 10 + categoría automatizada `"Otras"`).
-- Tendencia temporal cronológica continua (75 meses sin vacíos temporales) para Soja y Trigo.
-- **Alertas de capacidad operativa**: Umbrales del 75% (Advertencia) y 90% (Saturación) sobre el volumen crítico.
-- **Simulador Interactivo de Capacidad Crítica "What-If"** para evaluar escenarios de sobrecarga en el laboratorio.
+- **Distribución por Especie**: Pareto Top 10 + agrupación automatizada `"Otras"` con selector de visualización en Barras o Dona y tabla detallada.
+- **Gráfico Unificado de Evolución Mensual**: Serie temporal continua sin saltos temporales, con **Soja y Trigo anclados y preseleccionados por defecto**, y selector multi-cultivo para contrastar cualquier combinación de especies.
+- **Superposición de Total Consolidado**: Opción para visualizar simultáneamente la curva agregada de todo el laboratorio.
+- **Alertas de Capacidad Operativa**: Umbrales del 75% (Advertencia) y 90% (Saturación) sobre el volumen crítico mensual.
+- **Simulador Interactivo "What-If"**: Permite ajustar la capacidad crítica mensual de referencia para evaluar escenarios de sobrecarga operativa.
+- **Intervalos Críticos de Demanda**: Desglose analítico de los tipos de ensayo más solicitados (ej. Poder Germinativo, Pureza) para optimizar dotación de personal, insumos y turnos de guardia.
 
-### 3. Segmentación RFM y Alerta de Fuga (HU-03)
+### 3. Segmentación RFM y Alerta de Fuga de Clientes (HU-03 / Objetivo 4)
 - **Roles autorizados**: `admin`, `responsable_rrii`, `comercial`.
-- Pipeline de clasificación mediante **Score RFM de 3 dígitos (111 al 555)** basado en quintiles de Recencia, Frecuencia y Valor Monetario.
-- Exclusión por defecto de cuentas de convenio para análisis individual de clientes.
-- Detección dinámica y listado prioritario de gestión comercial para cuentas **En Riesgo** (baja recencia `R <= 2` con alta frecuencia o valor histórico `F >= 4` o `M >= 4`).
+- Pipeline de clasificación mediante **Scoring RFM de 3 dígitos (111 al 555)** basado en quintiles de Recencia, Frecuencia y Valor Monetario sobre la campaña **Ciclo 25/26** (o períodos configurables).
+- **Banner y Listado de Alerta de Churn / Riesgo Comercial**: Detección automática y priorización de cuentas clave con alta facturación/frecuencia histórica pero inactividad prolongada (`R <= 2` con `F >= 4` o `M >= 4`).
+- **Matriz Térmica 5x5 RF (Recencia vs. Frecuencia)**: Mapa de calor en escala monocromática `Greys` con selector de métrica (Cantidad de Clientes / Facturación Acumulada $).
+- Matriz Estratégica 2D y gráfico Donut de facturación por segmento (*Clientes Clave*, *Clientes Fieles*, *Nuevos/Prometedores*, *En Riesgo*).
+- Desglose de cartera completa con filtro multi-segmento y buscador por ID / Razón Social.
 
 ---
 
-## 🏛️ Arquitectura del Sistema (Clean Architecture en 5 Capas)
+## Arquitectura del Sistema (Clean Architecture en 5 Capas)
 
 El código fuente respeta estrictamente la separación de responsabilidades:
 
@@ -61,15 +66,15 @@ app-agro-lab/
 
 ---
 
-## 🔑 Matriz de Permisos por Rol (RBAC)
+## Matriz de Permisos por Rol (RBAC)
 
 | Rol (`role`) | Descripción | Módulos Autorizados |
 |---|---|---|
 | `admin` | Administrador General del Sistema | Acceso Total (HU-01, HU-02, HU-03) |
-| `responsable_laboratorio` | Responsable del Laboratorio | HU-01 (Clientes) + HU-02 (Cultivos) |
+| `responsable_laboratorio` | Responsable del Laboratorio | HU-01 (Clientes) + HU-02 (Cultivos y Capacidad) |
 | `analista_laboratorio` | Analista de Laboratorio | HU-02 (Cultivos y Capacidad) |
-| `responsable_rrii` | Responsable de Relaciones Institucionales | HU-01 (Clientes) + HU-03 (RFM) |
-| `comercial` | Responsable Comercial | HU-03 (Segmentación RFM) |
+| `responsable_rrii` | Responsable de Relaciones Institucionales | HU-01 (Clientes) + HU-03 (Segmentación RFM) |
+| `comercial` | Responsable Comercial | HU-03 (Segmentación RFM y Alerta de Fuga) |
 
 ---
 
@@ -115,7 +120,12 @@ app-agro-lab/
    streamlit run app.py
    ```
 
-6. **Ingresar al Dashboard**: Abrir en el navegador [http://localhost:8501](http://localhost:8501).
+6. **Ejecutar Pruebas Automatizadas**:
+   ```bash
+   pytest -v
+   ```
+
+7. **Ingresar al Dashboard**: Abrir en el navegador [http://localhost:8501](http://localhost:8501).
    - Contraseña predeterminada para todos los usuarios demo: `admin123`.
 
 ---

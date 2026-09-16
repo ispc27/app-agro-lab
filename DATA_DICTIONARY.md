@@ -16,7 +16,7 @@ Este documento define la estructura oficial, tipos de datos, descripciones comer
 
 | Variable Origen | Nombre Normalizado (`snake_case`) | Tipo Origen | Tipo Destino (ETL) | Nulos Permitidos | Descripción de Negocio | Rol en la Aplicación |
 |---|---|---|---|---|---|---|
-| `Fecha Ing Muestra` | `fecha_ing_muestra` | `Object` / `Text` | `datetime64[ns]` | No | Fecha de recepción e ingreso físico de la muestra al laboratorio. | Filtro de fechas principal, Cálculo de Churn Estacional (HU-01), Recencia RFM (HU-03). |
+| `Fecha Ing Muestra` | `fecha_ing_muestra` | `Object` / `Text` | `datetime64[ns]` | No | Fecha de recepción e ingreso físico de la muestra al laboratorio. | Filtro de fechas principal (HU-01, HU-02), Serie temporal continua (HU-02), Recencia RFM y Churn (HU-03). |
 | `Muestra` | `id_muestra` | `float64` | `int64` | No | Código de identificación único asignado a la muestra. | Clave Primaria. Conteos de volumen de muestras (HU-01, HU-02), Frecuencia RFM (HU-03). |
 | `Carta Camara` | `carta_camara` | `float64` | `Int64` / `float64` | Sí | Número de carta de porte o expediente arbitral asociado. | Atributo secundario de trazabilidad de la muestra. |
 | `Fecha de Certificacion` | `fecha_de_certificacion` | `datetime64[us]` | `datetime64[ns]` | Sí | Fecha oficial en que se emitió el certificado de análisis. | Control de tiempos de procesamiento técnico. |

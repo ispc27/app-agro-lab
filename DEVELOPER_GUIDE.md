@@ -38,9 +38,9 @@ El proyecto se estructura en tres módulos independientes correspondientes a las
 
 | Historia de Usuario | Etiqueta en Sidebar | Archivo de Vista (`src/views/`) | Módulo de Negocio (`src/modules/`) | Criterios Funcionales y Requerimientos |
 |---|---|---|---|---|
-| **HU-01** | Clientes y Churn | `frequent_clients_churn.py` | `frequent_clients_churn/` | • Tabla interactiva de clientes ordenados por volumen de muestras (descendente).<br/>• Filtrado por rango de fechas y especie de cultivo.<br/>• Alerta de Churn Estacional (volumen 0% en la ventana actual respecto al promedio histórico). |
-| **HU-02** | Cultivos y Capacidad | `crop_capacity.py` | `crop_capacity/` | • KPI de distribución por especie (Top 10 + agrupación automática "Otras").<br/>• Gráficos de tendencia continua para Trigo y Soja.<br/>• Alertas de capacidad operativa (75% advertencia, 90% saturación para cultivos críticos). |
-| **HU-03** | Segmentación RFM | `rfm_segmentation.py` | `rfm_segmentation/` | • Scoring RFM de 3 dígitos (del 111 al 555) mediante quintiles de Recencia, Frecuencia y Valor Monetario.<br/>• Etiquetado dinámico "En Riesgo" (Baja Recencia 1-2 con Alta Frecuencia/Valor 4-5). |
+| **HU-01 (Objetivo 1)** | Clientes Frecuentes | `frequent_clients_churn.py` | `frequent_clients_churn/` | • Ranking interactivo de clientes ordenados por volumen de muestras (descendente).<br/>• Filtros dinámicos por rango de fechas, estado de cuenta (Activos/Inactivos) y **filtro multi-especie** (`st.multiselect`).<br/>• Exclusión opcional de convenios (`id_cliente > 50.000`). |
+| **HU-02 (Objetivos 2 y 3)** | Cultivos y Capacidad | `crop_capacity.py` | `crop_capacity/` | • Distribución por especie (Pareto Top 10 + "Otras") con alternancia Barras/Dona.<br/>• **Gráfico unificado de evolución temporal continua**: Soja y Trigo preseleccionados por defecto, selector multi-cultivo y superposición de Total Consolidado.<br/>• Alertas de capacidad operativa (75% advertencia, 90% saturación) y simulador What-If.<br/>• Intervalos críticos de ensayos analíticos de mayor demanda. |
+| **HU-03 (Objetivo 4)** | Segmentación RFM | `rfm_segmentation.py` | `rfm_segmentation/` | • Scoring RFM de 3 dígitos (111 al 555) mediante quintiles de Recencia, Frecuencia y Valor Monetario (Ciclo 25/26).<br/>• **Alerta de Churn y Riesgo Comercial** para cuentas clave con baja recencia (`R <= 2`, `F/M >= 4`).<br/>• Matriz Térmica 5x5 RF en escala `Greys` (Clientes / Facturación).<br/>• Tabla de cartera completa con filtro multi-segmento y buscador. |
 
 ---
 
