@@ -33,7 +33,7 @@ else:
         if has_permission(["admin", "responsable_laboratorio", "responsable_rrii"]):
             render_frequent_clients_churn_view()
         else:
-            st.error("No tienes permisos suficientes para acceder al módulo de Clientes y Churn.")
+            st.error("No tienes permisos suficientes para acceder al módulo de Clientes Frecuentes.")
     elif selected_page_id == "crop_capacity":
         if has_permission(["admin", "responsable_laboratorio", "analista_laboratorio"]):
             render_crop_capacity_view()

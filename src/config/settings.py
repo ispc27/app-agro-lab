@@ -101,6 +101,17 @@ def load_agronomic_data() -> pd.DataFrame:
     # Rename columns to snake_case
     df = df.rename(columns=COLUMN_RENAME_MAP)
 
+    # Sanitize accent encodings from raw source
+    for col in ["especies", "tipo_analisis", "razon_social"]:
+        if col in df.columns:
+            df[col] = (
+                df[col].astype(str)
+                .str.replace("Maz", "Maíz", regex=False)
+                .str.replace("Man", "Maní", regex=False)
+                .str.replace("Algodn", "Algodón", regex=False)
+                .str.replace("Bsico", "Básico", regex=False)
+            )
+
     # Integer type casting for IDs
     df["id_muestra"] = df["id_muestra"].astype(int)
     df["id_cliente"] = df["id_cliente"].astype(int)
@@ -111,11 +122,3 @@ def load_agronomic_data() -> pd.DataFrame:
     df.to_csv(os.path.join(processed_dir, "cleaned_agro_data.csv"), index=False)
 
     return df
-
-
-@st.cache_data(show_spinner="Actualizando índice de inflación (INDEC)...")
-def load_ipc_data() -> pd.DataFrame | None:
-    """Loads national IPC inflation index (INDEC), using local backup if network is unavailable."""
-    from src.modules.rfm_segmentation.calculator import fetch_ipc_inflation_index
-    local_backup = os.path.join(get_base_dir(), "data", "raw", "ipc_indec_mensual.csv")
-    return fetch_ipc_inflation_index(local_backup_path=local_backup)

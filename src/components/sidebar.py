@@ -249,7 +249,7 @@ def render_sidebar() -> str:
     all_modules = [
         {
             "id": "frequent_clients_churn",
-            "label": "Clientes y Churn",
+            "label": "Clientes Frecuentes",
             "icon": ":material/group:",
             "roles": ["admin", "responsable_laboratorio", "responsable_rrii"],
         },

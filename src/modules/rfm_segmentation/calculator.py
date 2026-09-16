@@ -1,95 +1,66 @@
-import os
+import numpy as np
 import pandas as pd
 
-INFLATION_API_URL = (
-    "https://apis.datos.gob.ar/series/api/series/?limit=5000"
-    "&ids=148.3_INIVELNAL_DICI_M_26&format=csv"
-)
 AGREEMENT_ID_THRESHOLD = 50_000
 
 
-def fetch_ipc_inflation_index(local_backup_path: str | None = None) -> pd.DataFrame | None:
-    """Fetches National IPC index (INDEC) for inflation adjustment.
+def assign_rfm_segment(row: pd.Series) -> str:
+    """Categorizes a client into strategic commercial business segments based on RFM score."""
+    if row["en_riesgo"]:
+        return "En Riesgo de Fuga"
+    if row["R"] >= 4 and row["F"] >= 4 and row["M"] >= 4:
+        return "Clientes Clave"
+    if row["R"] >= 3 and (row["F"] >= 3 or row["M"] >= 3):
+        return "Clientes Fieles"
+    if row["R"] >= 4 and row["F"] <= 2:
+        return "Nuevos / Prometedores"
+    return "Inactivos de Bajo Impacto"
 
-    Attempts to fetch live data from official Argentina.gob.ar API.
-    If unavailable, falls back gracefully to local backup file (data/raw/ipc_indec_mensual.csv).
-
-    Args:
-        local_backup_path (str | None): Optional path to local backup CSV file.
-
-    Returns:
-        pd.DataFrame | None: DataFrame [anio_mes, ipc], or None if unavailable from all sources.
-    """
-    try:
-        ipc = pd.read_csv(
-            INFLATION_API_URL,
-            storage_options={"User-Agent": "Mozilla/5.0"},
-            parse_dates=["indice_tiempo"],
-        )
-        ipc = ipc.rename(columns={"ipc_nivel_general_nacional": "ipc"})
-    except Exception:
-        if not local_backup_path or not os.path.exists(local_backup_path):
-            return None
-        try:
-            ipc = pd.read_csv(local_backup_path, parse_dates=["indice_tiempo"])
-            ipc = ipc.rename(columns={"ipc_nivel_general_nacional": "ipc"})
-        except Exception:
-            return None
-
-    ipc["anio_mes"] = ipc["indice_tiempo"].dt.to_period("M")
-    return ipc[["anio_mes", "ipc"]]
-
-
-def adjust_real_amounts(df: pd.DataFrame, ipc_df: pd.DataFrame | None) -> pd.DataFrame:
-    """Adds column importe_real, adjusting importe_solicitud for inflation (IPC).
-
-    If IPC data is unavailable, degrades gracefully by setting importe_real equal to importe_solicitud.
-
-    Args:
-        df (pd.DataFrame): Clean dataset with fecha_ing_muestra, importe_solicitud.
-        ipc_df (pd.DataFrame | None): IPC index DataFrame [anio_mes, ipc], or None.
-
-    Returns:
-        pd.DataFrame: Copy of df with added importe_real column.
-    """
-    data = df.copy()
-
-    if ipc_df is None or ipc_df.empty:
-        data["importe_real"] = data["importe_solicitud"]
-        return data
-
-    data["anio_mes"] = data["fecha_ing_muestra"].dt.to_period("M")
-    data = data.merge(ipc_df, on="anio_mes", how="left")
-
-    base_ipc = ipc_df.loc[ipc_df["anio_mes"] == ipc_df["anio_mes"].max(), "ipc"].values[0]
-    data["importe_real"] = data["importe_solicitud"] * (base_ipc / data["ipc"])
-    data["importe_real"] = data["importe_real"].fillna(data["importe_solicitud"])
-
-    return data.drop(columns=["anio_mes", "ipc"])
 
 
 def compute_rfm_score(
     df: pd.DataFrame,
+    start_date: pd.Timestamp | str | None = None,
+    end_date: pd.Timestamp | str | None = None,
     reference_date: pd.Timestamp | None = None,
     exclude_agreements: bool = True,
 ) -> pd.DataFrame:
     """Computes RFM (Recency, Frequency, Monetary Value) scoring per client account.
 
     Quintiles are calculated using rank(method="first") prior to qcut to avoid binning errors on duplicate values.
+    Supports filtering by specific agricultural cycles (e.g., Ciclo 25/26).
+
+    Variables (RD-02):
+        - Recencia (R): Días transcurridos desde la última muestra ingresada.
+        - Frecuencia (F): Total de muestras analizadas (órdenes).
+        - Valor Monetario (M): Facturación acumulada nominal (importe_solicitud).
 
     Args:
-        df (pd.DataFrame): Clean dataset with fecha_ing_muestra, id_cliente, id_muestra, and (optionally) importe_real.
+        df (pd.DataFrame): Clean dataset with fecha_ing_muestra, id_cliente, id_muestra, importe_solicitud.
+        start_date (pd.Timestamp | str | None): Optional period lower boundary.
+        end_date (pd.Timestamp | str | None): Optional period upper boundary.
         reference_date (pd.Timestamp | None): Reference date for recency calculation. None uses dataset max date.
         exclude_agreements (bool): If True, excludes clients with id_cliente > 50,000 (campaign/agreement codes).
 
     Returns:
-        pd.DataFrame: Columns [id_cliente, recencia, frecuencia, valor_monetario, R, F, M, rfm_score, en_riesgo].
+        pd.DataFrame: Columns [id_cliente, razon_social, recencia, frecuencia, valor_monetario, R, F, M, rfm_score, en_riesgo, segmento, nivel_alerta].
     """
     data = df.copy()
-    value_column = "importe_real" if "importe_real" in data.columns else "importe_solicitud"
+
+    if start_date is not None:
+        data = data[data["fecha_ing_muestra"] >= pd.Timestamp(start_date)]
+    if end_date is not None:
+        data = data[data["fecha_ing_muestra"] <= pd.Timestamp(end_date)]
 
     if exclude_agreements:
         data = data[data["id_cliente"] <= AGREEMENT_ID_THRESHOLD]
+
+    if data.empty:
+        return pd.DataFrame(columns=[
+            "id_cliente", "razon_social", "recencia", "frecuencia",
+            "valor_monetario", "R", "F", "M", "rfm_score", "en_riesgo",
+            "segmento", "nivel_alerta"
+        ])
 
     if reference_date is None:
         reference_date = data["fecha_ing_muestra"].max()
@@ -99,14 +70,41 @@ def compute_rfm_score(
     rfm = data.groupby(group_cols).agg(
         recencia=("fecha_ing_muestra", lambda x: (reference_date - x.max()).days),
         frecuencia=("id_muestra", "nunique"),
-        valor_monetario=(value_column, "sum"),
+        valor_monetario=("importe_solicitud", "sum"),
     ).reset_index()
 
-    rfm["R"] = pd.qcut(rfm["recencia"].rank(method="first"), 5, labels=[5, 4, 3, 2, 1]).astype(int)
-    rfm["F"] = pd.qcut(rfm["frecuencia"].rank(method="first"), 5, labels=[1, 2, 3, 4, 5]).astype(int)
-    rfm["M"] = pd.qcut(rfm["valor_monetario"].rank(method="first"), 5, labels=[1, 2, 3, 4, 5]).astype(int)
+    num_clients = len(rfm)
+    if num_clients < 5:
+        # Graceful ranking assignment when client count is less than 5
+        ranks_r = rfm["recencia"].rank(method="first", ascending=False)
+        rfm["R"] = np.ceil(ranks_r / num_clients * 5).astype(int).clip(1, 5)
+
+        ranks_f = rfm["frecuencia"].rank(method="first", ascending=True)
+        rfm["F"] = np.ceil(ranks_f / num_clients * 5).astype(int).clip(1, 5)
+
+        ranks_m = rfm["valor_monetario"].rank(method="first", ascending=True)
+        rfm["M"] = np.ceil(ranks_m / num_clients * 5).astype(int).clip(1, 5)
+    else:
+        rfm["R"] = pd.qcut(rfm["recencia"].rank(method="first"), 5, labels=[5, 4, 3, 2, 1]).astype(int)
+        rfm["F"] = pd.qcut(rfm["frecuencia"].rank(method="first"), 5, labels=[1, 2, 3, 4, 5]).astype(int)
+        rfm["M"] = pd.qcut(rfm["valor_monetario"].rank(method="first"), 5, labels=[1, 2, 3, 4, 5]).astype(int)
 
     rfm["rfm_score"] = rfm["R"].astype(str) + rfm["F"].astype(str) + rfm["M"].astype(str)
     rfm["en_riesgo"] = (rfm["R"] <= 2) & ((rfm["F"] >= 4) | (rfm["M"] >= 4))
 
+    # Strategic commercial segment and alert levels
+    rfm["segmento"] = rfm.apply(assign_rfm_segment, axis=1)
+    
+    def determine_alert_level(row: pd.Series) -> str:
+        if not row["en_riesgo"]:
+            return "Activo Saludable"
+        if row["R"] == 1 and row["M"] >= 4:
+            return "Crítico (Fuga - Alta Exposición)"
+        return "Alto (Riesgo Fuga)"
+
+    rfm["nivel_alerta"] = rfm.apply(determine_alert_level, axis=1)
+
+
+
     return rfm.sort_values("valor_monetario", ascending=False).reset_index(drop=True)
+
