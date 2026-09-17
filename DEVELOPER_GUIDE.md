@@ -39,7 +39,7 @@ El proyecto se estructura en tres módulos independientes correspondientes a las
 | Historia de Usuario | Etiqueta en Sidebar | Archivo de Vista (`src/views/`) | Módulo de Negocio (`src/modules/`) | Criterios Funcionales y Requerimientos |
 |---|---|---|---|---|
 | **HU-01** | Clientes Frecuentes | `frequent_clients_churn.py` | `frequent_clients_churn/` | • Tabla interactiva de clientes ordenados por volumen de muestras (descendente).<br/>• Filtrado por rango de fechas y especie de cultivo. |
-| **HU-02** | Cultivos y Capacidad | `crop_capacity.py` | `crop_capacity/` | • KPI de distribución por especie (Top 10 + agrupación automática "Otras").<br/>• Gráficos de tendencia continua para Trigo y Soja.<br/>• Alertas de capacidad sobre el volumen mensual total de todas las especies (140 muestras: alerta operativa, 190 muestras: cuello de botella).<br/>• Filtro de período. |
+| **HU-02** | Cultivos y Capacidad | `crop_capacity.py` | `crop_capacity/` | • KPI de distribución por especie (Top 10 + agrupación automática "Otras").<br/>• Gráficos de tendencia continua para Trigo y Soja.<br/>• Alertas de capacidad sobre el volumen mensual total de todas las especies (142 muestras: alerta operativa, 191 muestras: cuello de botella).<br/>• Filtro de período. |
 | **HU-03** | Segmentación RFM | `rfm_segmentation.py` | `rfm_segmentation/` | • Scoring RFM de 3 dígitos (del 111 al 555) mediante quintiles de Recencia, Frecuencia y Valor Monetario.<br/>• Etiquetado dinámico "En Riesgo" (Baja Recencia 1-2 con Alta Frecuencia/Valor 4-5).<br/>• Filtro de período (por defecto, último año): solo se segmentan clientes con envíos en el período. |
 
 ---

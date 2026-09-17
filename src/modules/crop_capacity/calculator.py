@@ -4,8 +4,8 @@ import pandas as pd
 ESPECIES_EVOLUCION = ["Soja", "Trigo"]
 
 # Umbrales fijos de volumen mensual total (todas las especies), definidos por el laboratorio.
-UMBRAL_ALERTA_OPERATIVA = 140
-UMBRAL_CUELLO_BOTELLA = 190
+UMBRAL_ALERTA_OPERATIVA = 142
+UMBRAL_CUELLO_BOTELLA = 191
 
 
 def calcular_distribucion_especies(df: pd.DataFrame, top_n: int = 10) -> pd.DataFrame:
@@ -67,7 +67,7 @@ def calcular_alerta_capacidad(df: pd.DataFrame) -> pd.DataFrame:
     """Clasifica cada mes según el volumen total de muestras del laboratorio (Criterio 2.3).
 
     Suma las muestras de todas las especies y compara el total mensual contra los
-    umbrales fijos: Alerta operativa desde 140 muestras y Cuello de botella desde 190.
+    umbrales fijos: Alerta operativa desde 142 muestras y Cuello de botella desde 191.
 
     Args:
         df: DataFrame limpio con columnas fecha_ing_muestra, especies, id_muestra.

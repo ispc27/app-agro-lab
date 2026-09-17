@@ -15,7 +15,7 @@ La plataforma proporciona tres áreas analíticas principales:
 ### 2. Monitoreo de Cultivos y Capacidad Operativa
 - Métricas acumuladas y distribución por especie de cultivo (Top 10 y agrupación secundaria).
 - Análisis de evolución estacional de producción para cultivos clave.
-- Alertas de capacidad operativa sobre el volumen mensual total de muestras (todas las especies): alerta operativa desde 140 muestras y cuello de botella desde 190.
+- Alertas de capacidad operativa sobre el volumen mensual total de muestras (todas las especies): alerta operativa desde 142 muestras y cuello de botella desde 191.
 
 ### 3. Segmentación RFM y Riesgo de Fuga
 - Clasificación de cuentas mediante scoring RFM (Recencia, Frecuencia y Valor Monetario) sobre un período filtrable (por defecto, el último año).
