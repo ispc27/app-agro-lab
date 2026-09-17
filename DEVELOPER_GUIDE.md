@@ -26,7 +26,7 @@ flowchart TD
 3. **`src/config/`**: Configuración del sistema (`settings.py`), resolución de rutas absolutas y carga en caché de datos con `@st.cache_data`.
 4. **`src/core/`**: Infraestructura de seguridad (`auth.py` para autenticación RBAC con bcrypt y `session.py` para el ciclo de vida de la sesión).
 5. **`src/components/`**: Componentes estandarizados de UI (`theme.py` para tipografía Poppins y reglas CSS, `sidebar.py` para navegación).
-6. **`src/modules/`**: Capa de lógica de negocio pura en Python (scoring RFM, cálculos de churn, umbrales de capacidad).
+6. **`src/modules/`**: Capa de lógica de negocio pura en Python (scoring RFM, volumen por cliente, umbrales de capacidad).
 7. **`src/views/`**: Controladores de vista en Streamlit que ensamblan los datos de `src/modules/` en dashboards visuales.
 8. **`app.py`**: Punto de entrada raíz y enrutador principal.
 
@@ -38,9 +38,9 @@ El proyecto se estructura en tres módulos independientes correspondientes a las
 
 | Historia de Usuario | Etiqueta en Sidebar | Archivo de Vista (`src/views/`) | Módulo de Negocio (`src/modules/`) | Criterios Funcionales y Requerimientos |
 |---|---|---|---|---|
-| **HU-01** | Clientes y Churn | `frequent_clients_churn.py` | `frequent_clients_churn/` | • Tabla interactiva de clientes ordenados por volumen de muestras (descendente).<br/>• Filtrado por rango de fechas y especie de cultivo.<br/>• Alerta de Churn Estacional (volumen 0% en la ventana actual respecto al promedio histórico). |
-| **HU-02** | Cultivos y Capacidad | `crop_capacity.py` | `crop_capacity/` | • KPI de distribución por especie (Top 10 + agrupación automática "Otras").<br/>• Gráficos de tendencia continua para Trigo y Soja.<br/>• Alertas de capacidad operativa (75% advertencia, 90% saturación para cultivos críticos). |
-| **HU-03** | Segmentación RFM | `rfm_segmentation.py` | `rfm_segmentation/` | • Scoring RFM de 3 dígitos (del 111 al 555) mediante quintiles de Recencia, Frecuencia y Valor Monetario.<br/>• Etiquetado dinámico "En Riesgo" (Baja Recencia 1-2 con Alta Frecuencia/Valor 4-5). |
+| **HU-01** | Clientes Frecuentes | `frequent_clients_churn.py` | `frequent_clients_churn/` | • Tabla interactiva de clientes ordenados por volumen de muestras (descendente).<br/>• Filtrado por rango de fechas y especie de cultivo. |
+| **HU-02** | Cultivos y Capacidad | `crop_capacity.py` | `crop_capacity/` | • KPI de distribución por especie (Top 10 + agrupación automática "Otras").<br/>• Gráficos de tendencia continua para Trigo y Soja.<br/>• Alertas de capacidad sobre el volumen mensual total de todas las especies (140 muestras: alerta operativa, 190 muestras: cuello de botella).<br/>• Filtro de período. |
+| **HU-03** | Segmentación RFM | `rfm_segmentation.py` | `rfm_segmentation/` | • Scoring RFM de 3 dígitos (del 111 al 555) mediante quintiles de Recencia, Frecuencia y Valor Monetario.<br/>• Etiquetado dinámico "En Riesgo" (Baja Recencia 1-2 con Alta Frecuencia/Valor 4-5).<br/>• Filtro de período (por defecto, último año): solo se segmentan clientes con envíos en el período. |
 
 ---
 

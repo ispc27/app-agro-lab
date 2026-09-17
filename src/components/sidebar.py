@@ -246,7 +246,7 @@ def render_sidebar() -> str:
 
     # 3. Navigation Modules list
     modules = [
-        {"id": "frequent_clients_churn", "label": "Clientes y Churn", "icon": ":material/group:"},
+        {"id": "frequent_clients_churn", "label": "Clientes Frecuentes", "icon": ":material/group:"},
         {"id": "crop_capacity", "label": "Cultivos y Capacidad", "icon": ":material/show_chart:"},
         {"id": "rfm_segmentation", "label": "Segmentación RFM", "icon": ":material/analytics:"}
     ]

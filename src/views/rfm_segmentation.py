@@ -1,16 +1,9 @@
-import os
-
 import plotly.express as px
 import streamlit as st
+from src.components.period_filter import render_period_filter
 from src.components.theme import render_header
-from src.config.settings import get_base_dir, load_agronomic_data
-from src.modules.rfm_segmentation import cargar_ipc, calcular_importe_real, calcular_rfm
-
-
-@st.cache_data(show_spinner="Actualizando índice de inflación (INDEC)...")
-def _cargar_ipc_cacheado():
-    ruta_backup = os.path.join(get_base_dir(), "data", "raw", "ipc_indec_mensual.csv")
-    return cargar_ipc(ruta_backup_local=ruta_backup)
+from src.config.settings import load_agronomic_data
+from src.modules.rfm_segmentation import calcular_rfm, MIN_CLIENTES_RFM
 
 
 def render_rfm_segmentation_view():
@@ -25,15 +18,23 @@ def render_rfm_segmentation_view():
         st.warning("No se encontraron muestras para el período seleccionado.")
         return
 
-    ipc = _cargar_ipc_cacheado()
-    if ipc is None:
-        st.info(
-            "No se pudo obtener el IPC del INDEC (sin conexión y sin respaldo local). "
-            "El Valor Monetario se calcula con importes nominales, sin ajustar por inflación."
-        )
-    df = calcular_importe_real(df, ipc)
+    filtros = render_period_filter(df, key_prefix="rfm", rango_inicial="Último año")
+    if filtros is None:
+        return
+    fecha_inicio, fecha_fin, _ = filtros
 
-    rfm = calcular_rfm(df, excluir_convenio=True)
+    rfm = calcular_rfm(df, fecha_inicio=fecha_inicio, fecha_fin=fecha_fin, excluir_convenio=True)
+    if rfm.empty:
+        st.info(
+            f"Se necesitan al menos {MIN_CLIENTES_RFM} clientes con envíos en el período "
+            "seleccionado para calcular la segmentación RFM."
+        )
+        return
+
+    st.caption(
+        f"Solo se segmentan clientes con envíos entre el {fecha_inicio:%d/%m/%Y} y el "
+        f"{fecha_fin:%d/%m/%Y}. La recencia se mide en días hasta la fecha Hasta."
+    )
 
     # --- KPIs ---
     col1, col2, col3 = st.columns(3)
@@ -61,13 +62,13 @@ def render_rfm_segmentation_view():
     # --- Alerta: clientes En Riesgo (listado prioritario) ---
     st.markdown("#### Alerta de Fuga: clientes En Riesgo")
     st.caption(
-        "Baja Recencia (quintil 1-2) combinada con Alta Frecuencia o Alto Valor histórico "
-        "(quintil 4-5): eran buenos clientes y dejaron de operar recientemente."
+        "Baja Recencia (quintil 1-2) combinada con Alta Frecuencia o Alto Valor "
+        "(quintil 4-5): eran buenos clientes en el período y dejaron de operar recientemente."
     )
 
     en_riesgo = rfm[rfm["en_riesgo"]].copy()
     if en_riesgo.empty:
-        st.success("No hay clientes en alerta de fuga con los datos actuales.")
+        st.success("No hay clientes en alerta de fuga para el período seleccionado.")
     else:
         st.warning(f"{en_riesgo.shape[0]} cliente(s) en alerta de fuga — listado prioritario para gestión comercial.")
         en_riesgo["valor_monetario"] = en_riesgo["valor_monetario"].round(0)
@@ -76,8 +77,8 @@ def render_rfm_segmentation_view():
         ].rename(columns={
             "id_cliente": "Cliente (Id)",
             "recencia": "Días sin operar",
-            "frecuencia": "Muestras históricas",
-            "valor_monetario": "Valor histórico ($)",
+            "frecuencia": "Muestras en el período",
+            "valor_monetario": "Valor en el período ($)",
             "rfm_score": "Score RFM",
         })
         st.dataframe(en_riesgo_mostrar, use_container_width=True, hide_index=True)

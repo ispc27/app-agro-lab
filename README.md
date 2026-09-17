@@ -1,6 +1,6 @@
 # AgroLab — Plataforma de Análisis y Analítica Agronómica
 
-Plataforma corporativa e interactiva para el análisis de datos agronómicos, monitoreo de capacidad operativa de laboratorios, detección de churn estacional y segmentación comercial de cuentas.
+Plataforma corporativa e interactiva para el análisis de datos agronómicos, monitoreo de capacidad operativa de laboratorios y segmentación comercial de cuentas.
 
 ---
 
@@ -8,18 +8,17 @@ Plataforma corporativa e interactiva para el análisis de datos agronómicos, mo
 
 La plataforma proporciona tres áreas analíticas principales:
 
-### 1. Análisis de Clientes Frecuentes y Churn Estacional
+### 1. Análisis de Clientes Frecuentes
 - Monitoreo de cuentas por volumen de muestras enviadas al laboratorio.
 - Filtros interactivos por periodo de tiempo y especie de cultivo.
-- Detección de alertas por caída anómala en la recencia de envíos respecto a promedios históricos.
 
 ### 2. Monitoreo de Cultivos y Capacidad Operativa
 - Métricas acumuladas y distribución por especie de cultivo (Top 10 y agrupación secundaria).
 - Análisis de evolución estacional de producción para cultivos clave.
-- Indicadores y alertas de volumen al alcanzar umbrales críticos de capacidad operativa en el laboratorio (75% de advertencia y 90% de saturación).
+- Alertas de capacidad operativa sobre el volumen mensual total de muestras (todas las especies): alerta operativa desde 140 muestras y cuello de botella desde 190.
 
 ### 3. Segmentación RFM y Riesgo de Fuga
-- Clasificación de cuentas mediante scoring RFM (Recencia, Frecuencia y Valor Monetario).
+- Clasificación de cuentas mediante scoring RFM (Recencia, Frecuencia y Valor Monetario) sobre un período filtrable (por defecto, el último año).
 - Detección dinámica y listado prioritario de cuentas en riesgo de fuga para gestión comercial.
 
 ---
