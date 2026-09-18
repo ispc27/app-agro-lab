@@ -416,13 +416,13 @@ def render_rfm_segmentation_view():
             if seg == "En Riesgo":
                 return ["background-color: #FEE2E2; color: #991B1B; font-weight: 600;"] * len(row)
             elif seg == "Campeones":
-                return ["background-color: #F8FAFC; color: #0F172A; font-weight: 600;"] * len(row)
+                return ["background-color: #DCFCE7; color: #166534; font-weight: 600;"] * len(row)
             elif seg == "Fieles / Alto Valor":
-                return ["background-color: #F8FAFC; color: #334155;"] * len(row)
+                return ["background-color: #EFF6FF; color: #1E40AF;"] * len(row)
             elif seg == "Potenciales":
-                return ["background-color: #F8FAFC; color: #475569;"] * len(row)
+                return ["background-color: #FEF3C7; color: #92400E; font-weight: 500;"] * len(row)
             elif seg == "Perdidos":
-                return ["background-color: #F1F5F9; color: #64748B;"] * len(row)
+                return ["background-color: #F1F5F9; color: #475569;"] * len(row)
             return [""] * len(row)
 
         styled_full = full_table_df.style.apply(highlight_full_portfolio, axis=1).format({
