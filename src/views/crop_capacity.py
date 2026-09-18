@@ -338,16 +338,16 @@ def render_crop_capacity_view():
         hovertemplate="<b>Total Consolidado</b><br>Fecha: %{customdata}<br>Muestras: %{y:,}<extra></extra>",
     ))
 
-    # Optional comparison crops
+    # Optional comparison crops in monochromatic slate palette
     crop_palette = {
-        "Soja": "#10B981",
-        "Trigo": "#2563EB",
-        "Maíz": "#F59E0B",
-        "Girasol": "#8B5CF6",
-        "Cebada": "#EC4899",
-        "Sorgo": "#06B6D4",
+        "Soja": "#334155",
+        "Trigo": "#64748B",
+        "Maíz": "#94A3B8",
+        "Girasol": "#CBD5E1",
+        "Cebada": "#475569",
+        "Sorgo": "#1E293B",
     }
-    fallback_colors = ["#64748B", "#84CC16", "#D97706", "#0D9488", "#6366F1", "#A855F7"]
+    fallback_colors = ["#475569", "#64748B", "#94A3B8", "#CBD5E1"]
 
     for idx, crop_name in enumerate(compare_crops):
         crop_evo = compute_monthly_evolution(df, crop_name)
@@ -473,8 +473,8 @@ def render_crop_capacity_view():
     if selected_seas_crops:
         fig_seas = go.Figure()
         seas_colors = {
-            "Soja": "#10B981",  # Verde esmeralda
-            "Trigo": "#2563EB",  # Azul corporativo
+            "Soja": "#111827",  # Carbón oscuro (trazo sólido)
+            "Trigo": "#64748B",  # Pizarra medio (trazo discontinuo)
         }
 
         for crop_name in selected_seas_crops:

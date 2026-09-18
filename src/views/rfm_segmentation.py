@@ -141,11 +141,11 @@ def render_rfm_segmentation_view():
         "Perdidos",
     ]
     COLOR_PALETTE = {
-        "Campeones": "#10B981",          # Verde esmeralda (activo más valioso)
-        "Fieles / Alto Valor": "#2563EB", # Azul corporativo (clientes sólidos)
-        "Potenciales": "#F59E0B",        # Ámbar (oportunidad de crecimiento)
-        "En Riesgo": "#DC2626",          # Rojo alerta (retención urgente)
-        "Perdidos": "#64748B",           # Gris pizarra (bajo retorno esperado)
+        "Campeones": "#0F172A",          # Carbón profundo (máximo engagement/valor)
+        "Fieles / Alto Valor": "#334155", # Pizarra oscuro (cuentas sólidas y recurrentes)
+        "Potenciales": "#64748B",        # Pizarra medio (cuentas recientes en desarrollo)
+        "Perdidos": "#94A3B8",           # Pizarra claro (baja actividad histórica)
+        "En Riesgo": "#DC2626",          # Rojo alerta semántico (fuga de capital crítica)
     }
 
     tab_distrib, tab_matrix = st.tabs([
@@ -416,13 +416,13 @@ def render_rfm_segmentation_view():
             if seg == "En Riesgo":
                 return ["background-color: #FEE2E2; color: #991B1B; font-weight: 600;"] * len(row)
             elif seg == "Campeones":
-                return ["background-color: #DCFCE7; color: #166534; font-weight: 600;"] * len(row)
+                return ["background-color: #F8FAFC; color: #0F172A; font-weight: 600;"] * len(row)
             elif seg == "Fieles / Alto Valor":
-                return ["background-color: #EFF6FF; color: #1E40AF;"] * len(row)
+                return ["background-color: #F8FAFC; color: #334155;"] * len(row)
             elif seg == "Potenciales":
-                return ["background-color: #FEF3C7; color: #92400E; font-weight: 500;"] * len(row)
+                return ["background-color: #F8FAFC; color: #475569;"] * len(row)
             elif seg == "Perdidos":
-                return ["background-color: #F1F5F9; color: #475569;"] * len(row)
+                return ["background-color: #F1F5F9; color: #64748B;"] * len(row)
             return [""] * len(row)
 
         styled_full = full_table_df.style.apply(highlight_full_portfolio, axis=1).format({
