@@ -74,40 +74,49 @@ def assess_capacity_alerts(
     df: pd.DataFrame,
     crop_species: str | list[str] | None = None,
     critical_capacity: float | None = None,
+    warning_threshold: float = 142.0,
+    bottleneck_threshold: float = 191.0,
 ) -> tuple[pd.DataFrame, float]:
     """Evaluates monthly operational capacity status for a crop or consolidated lab volume.
 
-    Compares monthly volume against a reference critical capacity (defaulting to the historical max
-    monthly volume for that selection) and classifies each month into Normal / Advertencia (>=75%) / Saturación (>=90%).
+    When critical_capacity is provided, uses custom capacity percentage thresholds (>=75% Advertencia, >=90% Saturación).
+    When critical_capacity is None, applies the fixed laboratory operational thresholds:
+    warning_threshold = 142.0 (Alerta Operativa / Amarillo) and bottleneck_threshold = 191.0 (Cuello de Botella / Rojo).
 
     Args:
         df (pd.DataFrame): Clean dataset with fecha_ing_muestra, especies, id_muestra.
         crop_species (str | list[str] | None): Target crop species or None/'Todos los Cultivos' for total consolidated lab volume.
-        critical_capacity (float | None): Reference monthly volume (100%). Default uses max monthly volume.
+        critical_capacity (float | None): Reference monthly volume if in custom percentage mode.
+        warning_threshold (float): Fixed operational warning threshold (default 142 samples/month).
+        bottleneck_threshold (float): Fixed operational bottleneck threshold (default 191 samples/month).
 
     Returns:
         tuple[pd.DataFrame, float]: Tuple containing (DataFrame [fecha, total_muestras, porcentaje_capacidad, estado], capacity_used).
     """
     evolution = compute_monthly_evolution(df, crop_species)
 
-    if critical_capacity is None:
-        if evolution.empty or evolution["total_muestras"].empty:
-            critical_capacity = 100.0
+    if critical_capacity is not None:
+        if critical_capacity <= 0:
+            evolution["porcentaje_capacidad"] = 0.0
         else:
-            critical_capacity = float(evolution["total_muestras"].max())
+            evolution["porcentaje_capacidad"] = (evolution["total_muestras"] / critical_capacity * 100).round(1)
 
-    if critical_capacity <= 0:
-        evolution["porcentaje_capacidad"] = 0.0
+        conditions = [
+            evolution["porcentaje_capacidad"] >= 90,
+            evolution["porcentaje_capacidad"] >= 75,
+        ]
+        evolution["estado"] = np.select(conditions, ["Saturación", "Advertencia"], default="Normal")
+        ref_cap = critical_capacity
     else:
-        evolution["porcentaje_capacidad"] = (evolution["total_muestras"] / critical_capacity * 100).round(1)
+        conditions = [
+            evolution["total_muestras"] >= bottleneck_threshold,
+            evolution["total_muestras"] >= warning_threshold,
+        ]
+        evolution["estado"] = np.select(conditions, ["Cuello de Botella", "Alerta Operativa"], default="Normal")
+        evolution["porcentaje_capacidad"] = (evolution["total_muestras"] / bottleneck_threshold * 100).round(1)
+        ref_cap = bottleneck_threshold
 
-    conditions = [
-        evolution["porcentaje_capacidad"] >= 90,
-        evolution["porcentaje_capacidad"] >= 75,
-    ]
-    evolution["estado"] = np.select(conditions, ["Saturación", "Advertencia"], default="Normal")
-
-    return evolution, critical_capacity
+    return evolution, ref_cap
 
 
 def compute_critical_intervals(

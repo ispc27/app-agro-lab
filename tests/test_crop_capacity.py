@@ -79,6 +79,29 @@ def test_capacity_alerts_thresholds():
     assert states[3] == "Saturación"
 
 
+def test_fixed_operational_thresholds_142_and_191():
+    # Jan: 100 (< 142 -> Normal)
+    # Feb: 150 (>= 142 and < 191 -> Alerta Operativa)
+    # Mar: 200 (>= 191 -> Cuello de Botella)
+    records = []
+    for _ in range(100):
+        records.append({"fecha_ing_muestra": pd.Timestamp("2026-01-10"), "id_muestra": len(records) + 1, "especies": "Soja"})
+    for _ in range(150):
+        records.append({"fecha_ing_muestra": pd.Timestamp("2026-02-10"), "id_muestra": len(records) + 1, "especies": "Soja"})
+    for _ in range(200):
+        records.append({"fecha_ing_muestra": pd.Timestamp("2026-03-10"), "id_muestra": len(records) + 1, "especies": "Soja"})
+
+    df = pd.DataFrame(records)
+    res, ref_cap = assess_capacity_alerts(df, "Soja")
+    assert ref_cap == 191.0
+
+    states = dict(zip(res["fecha"].dt.month, res["estado"]))
+    assert states[1] == "Normal"
+    assert states[2] == "Alerta Operativa"
+    assert states[3] == "Cuello de Botella"
+
+
+
 def test_compute_critical_intervals(sample_crops_df):
     intervals = compute_critical_intervals(sample_crops_df, ["Soja", "Trigo"])
     assert not intervals.empty
