@@ -31,6 +31,7 @@ Este documento define la estructura oficial, tipos de datos, descripciones comer
 | `Tipo analisis` | `tipo_analisis` | `string` | `string` | Sí | Nombre técnico del ensayo o determinación analítica solicitada. | Clasificación de servicios de laboratorio. |
 | `Especies` | `especies` | `string` | `string` | Sí | Tipo de cultivo agronómico de la muestra (Soja, Trigo, Maíz, Maní, etc.). | Filtro por cultivo (HU-01), Distribución Pareto Top 10 + Otras y Alertas de Capacidad (HU-02). |
 | `Importe Solicitud` | `importe_solicitud` | `float64` | `float64` | No | Monto nominal cobrado por la solicitud de análisis ($ ARS). | Base para el cálculo del Valor Monetario (M) en la Segmentación RFM (HU-03). |
+| *Calculada (ETL)* | `anio` | `int64` | `int64` | No | Año calendario de ingreso de la muestra (`YYYY`). | Variable analítica auxiliar para agregaciones anuales. |
 
 ---
 
