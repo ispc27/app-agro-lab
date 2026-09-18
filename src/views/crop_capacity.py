@@ -195,9 +195,11 @@ def render_crop_capacity_view():
         st.plotly_chart(fig_pie, use_container_width=True)
 
     with st.expander("Ver Tabla Detallada de Distribución de Especies"):
-        styled_dist = distribution_df.style.format({
-            "total_muestras": "{:,.0f}",
-            "porcentaje": "{:.1f}%",
+        dist_table_df = distribution_df.copy()
+        dist_table_df.columns = ["Especie de Cultivo", "Total Muestras", "% de Participación"]
+        styled_dist = dist_table_df.style.format({
+            "Total Muestras": "{:,.0f}",
+            "% de Participación": "{:.1f}%",
         })
         st.dataframe(
             styled_dist,
