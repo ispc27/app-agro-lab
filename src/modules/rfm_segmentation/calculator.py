@@ -5,17 +5,24 @@ AGREEMENT_ID_THRESHOLD = 50_000
 
 
 def assign_rfm_segment(row: pd.Series) -> str:
-    """Categorizes a client into strategic commercial business segments based on RFM score."""
-    if row["en_riesgo"]:
-        return "En Riesgo de Fuga"
-    if row["R"] >= 4 and row["F"] >= 4 and row["M"] >= 4:
-        return "Clientes Clave"
-    if row["R"] >= 3 and (row["F"] >= 3 or row["M"] >= 3):
-        return "Clientes Fieles"
-    if row["R"] >= 4 and row["F"] <= 2:
-        return "Nuevos / Prometedores"
-    return "Inactivos de Bajo Impacto"
+    """Categorizes a client into strategic commercial business segments based on RFM score.
 
+    Official Categories:
+        - En Riesgo: Cuentas históricas de alto volumen/facturación cuya recencia cayó (R <= 2 con F >= 4 o M >= 4).
+        - Campeones: Activo más valioso; compran recientemente, con alta frecuencia y mayor gasto (R >= 4, F >= 4, M >= 4).
+        - Fieles / Alto Valor: Comportamiento sólido y sostenido; candidatos para upselling (R >= 3 y (F >= 3 o M >= 3)).
+        - Potenciales: Clientes recientes pero con bajo volumen acumulado (R >= 3 y F <= 2).
+        - Perdidos: Menor score en los tres indicadores; inactivos de bajo retorno (R <= 2 y F <= 3 y M <= 3).
+    """
+    if row["en_riesgo"]:
+        return "En Riesgo"
+    if row["R"] >= 4 and row["F"] >= 4 and row["M"] >= 4:
+        return "Campeones"
+    if row["R"] >= 3 and (row["F"] >= 3 or row["M"] >= 3):
+        return "Fieles / Alto Valor"
+    if row["R"] >= 3 and row["F"] <= 2:
+        return "Potenciales"
+    return "Perdidos"
 
 
 def compute_rfm_score(
@@ -23,7 +30,7 @@ def compute_rfm_score(
     start_date: pd.Timestamp | str | None = None,
     end_date: pd.Timestamp | str | None = None,
     reference_date: pd.Timestamp | None = None,
-    exclude_agreements: bool = True,
+    exclude_agreements: bool = False,
 ) -> pd.DataFrame:
     """Computes RFM (Recency, Frequency, Monetary Value) scoring per client account.
 
@@ -40,10 +47,10 @@ def compute_rfm_score(
         start_date (pd.Timestamp | str | None): Optional period lower boundary.
         end_date (pd.Timestamp | str | None): Optional period upper boundary.
         reference_date (pd.Timestamp | None): Reference date for recency calculation. None uses dataset max date.
-        exclude_agreements (bool): If True, excludes clients with id_cliente > 50,000 (campaign/agreement codes).
+        exclude_agreements (bool): If True, excludes clients with id_cliente > 50,000 (default False; all clients evaluated).
 
     Returns:
-        pd.DataFrame: Columns [id_cliente, razon_social, recencia, frecuencia, valor_monetario, R, F, M, rfm_score, en_riesgo, segmento, nivel_alerta].
+        pd.DataFrame: Columns [id_cliente, razon_social, recencia, frecuencia, valor_monetario, R, F, M, rfm_score, en_riesgo, segmento, nivel_alerta, accion_recomendada].
     """
     data = df.copy()
 
@@ -59,7 +66,7 @@ def compute_rfm_score(
         return pd.DataFrame(columns=[
             "id_cliente", "razon_social", "recencia", "frecuencia",
             "valor_monetario", "R", "F", "M", "rfm_score", "en_riesgo",
-            "segmento", "nivel_alerta"
+            "segmento", "nivel_alerta", "accion_recomendada"
         ])
 
     if reference_date is None:
@@ -94,17 +101,23 @@ def compute_rfm_score(
 
     # Strategic commercial segment and alert levels
     rfm["segmento"] = rfm.apply(assign_rfm_segment, axis=1)
-    
+
     def determine_alert_level(row: pd.Series) -> str:
         if not row["en_riesgo"]:
             return "Activo Saludable"
         if row["R"] == 1 and row["M"] >= 4:
-            return "Crítico (Fuga - Alta Exposición)"
-        return "Alto (Riesgo Fuga)"
+            return "Crítico (Alta Exposición)"
+        return "Alto Riesgo"
+
+    def determine_recommended_action(row: pd.Series) -> str:
+        if not row["en_riesgo"]:
+            return "Fidelización regular"
+        if row["R"] == 1 and row["M"] >= 4:
+            return "Contacto telefónico prioritario / Oferta especial"
+        return "Relevamiento comercial pre-campaña"
 
     rfm["nivel_alerta"] = rfm.apply(determine_alert_level, axis=1)
-
-
+    rfm["accion_recomendada"] = rfm.apply(determine_recommended_action, axis=1)
 
     return rfm.sort_values("valor_monetario", ascending=False).reset_index(drop=True)
 

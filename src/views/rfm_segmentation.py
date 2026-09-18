@@ -1,7 +1,7 @@
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from src.components.theme import render_header
+from src.components.theme import render_header, render_metric_card, render_alert_box
 from src.config.settings import load_agronomic_data
 from src.modules.rfm_segmentation import compute_rfm_score
 
@@ -21,7 +21,7 @@ def render_rfm_segmentation_view():
     min_dataset_date = df["fecha_ing_muestra"].min().date()
     max_dataset_date = df["fecha_ing_muestra"].max().date()
 
-    col_filter1, col_filter2, col_filter3, col_filter4 = st.columns([2, 1, 1, 1])
+    col_filter1, col_filter2, col_filter3 = st.columns([2, 1, 1])
 
     with col_filter1:
         period_mode = st.selectbox(
@@ -71,12 +71,6 @@ def render_rfm_segmentation_view():
             format="DD/MM/YYYY",
             disabled=(period_mode != "Rango Personalizado"),
         )
-    with col_filter4:
-        exclude_agreements = st.checkbox(
-            "Excluir convenios (ID > 50.000)",
-            value=True,
-            help="Las cuentas de convenio institucional se excluyen del scoring individual.",
-        )
 
     if start_date_input > end_date_input:
         st.error("La fecha Desde no puede ser posterior a la fecha Hasta.")
@@ -85,14 +79,13 @@ def render_rfm_segmentation_view():
     start_filter = start_date_input if period_mode != "Histórico Completo" else None
     end_filter = end_date_input if period_mode != "Histórico Completo" else None
 
-    # Compute RFM scoring
+    # Compute RFM scoring across all clients
     rfm_df = compute_rfm_score(
         df,
         start_date=start_filter,
         end_date=end_filter,
-        exclude_agreements=exclude_agreements,
+        exclude_agreements=False,
     )
-
 
     if rfm_df.empty:
         st.info("No se encontraron clientes para los filtros seleccionados.")
@@ -107,10 +100,6 @@ def render_rfm_segmentation_view():
 
     col1, col2, col3, col4 = st.columns(4)
 
-    def render_metric_card(label: str, value: str, badge_text: str | None = None, badge_bg: str = "#FEE2E2", badge_color: str = "#991B1B") -> str:
-        badge_html = f'<span style="background-color: {badge_bg}; color: {badge_color}; font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; white-space: nowrap;">{badge_text}</span>' if badge_text else ""
-        return f'<div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px 18px; min-height: 98px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02);"><div style="color: #64748B; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">{label}</div><div style="display: flex; align-items: baseline; gap: 8px; flex-wrap: nowrap;"><span style="color: #111827; font-size: 1.55rem; font-weight: 700; line-height: 1.2;">{value}</span>{badge_html}</div></div>'
-
     with col1:
         st.markdown(render_metric_card("Clientes Segmentados", f"{rfm_df.shape[0]:,}".replace(",", ".")), unsafe_allow_html=True)
     with col2:
@@ -123,171 +112,241 @@ def render_rfm_segmentation_view():
     # Clean corporate alert container without left border or emojis
     if at_risk_count > 0:
         avg_risk_inactivity = int(at_risk_df["recencia"].mean())
-        alert_card_html = (
-            f'<div style="background-color: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; padding: 16px 22px; margin: 15px 0 25px 0;">'
-            f'<div style="margin-bottom: 6px;"><strong style="color: #991B1B; font-size: 1.05rem; letter-spacing: -0.01em; text-transform: uppercase;">'
-            f'Alerta Comercial: {at_risk_count} Cuentas Estratégicas en Riesgo de Fuga</strong></div>'
-            f'<div style="color: #7F1D1D; font-size: 0.92rem; line-height: 1.5;">'
-            f'Se identificaron <strong>{at_risk_count} cuentas de alto valor histórico o alta frecuencia</strong> que presentan '
-            f'más de <strong>{avg_risk_inactivity} días promedio de inactividad</strong> (Recencia R ≤ 2). '
-            f'El capital acumulado expuesto asciende a <strong>${at_risk_value:,.0f}</strong> ({risk_pct_value:.1f}% de la facturación del período). '
-            f'Se recomienda priorizar estas cuentas para gestiones inmediatas de retención.</div></div>'
+        alert_title = f"Alerta Comercial: {at_risk_count} Cuentas Estratégicas en Riesgo de Fuga"
+        alert_msg = (
+            f"Se identificaron <strong>{at_risk_count} cuentas de alto valor histórico o alta frecuencia</strong> que presentan "
+            f"más de <strong>{avg_risk_inactivity} días promedio de inactividad</strong> (Recencia R ≤ 2). "
+            f"El capital acumulado expuesto asciende a <strong>${at_risk_value:,.0f}</strong> ({risk_pct_value:.1f}% de la facturación del período). "
+            f"Se recomienda priorizar estas cuentas para gestiones inmediatas de retención comercial."
         )
-        st.markdown(alert_card_html, unsafe_allow_html=True)
-
+        st.markdown(render_alert_box(alert_title, alert_msg, alert_type="danger"), unsafe_allow_html=True)
 
     st.markdown("---")
 
-    # --- Visual Analytics: Strategic Matrix & Portfolio Segments ---
-    st.markdown("#### Matriz Estratégica RFM y Análisis de Cartera")
+    # =========================================================================
+    # --- SECTION: Visual Portfolio Segmentation (5 Official Categories) ---
+    # =========================================================================
+    st.markdown("#### Segmentación de Cartera por Categorías de Negocio")
     st.caption(
-        "Distribución bidimensional del valor comercial frente a la inactividad temporal. Las cuentas en la zona de riesgo "
-        "combinan alta facturación acumulada con prolongada inactividad."
+        "Distribución visual de los clientes en las 5 categorías estratégicas: "
+        "Campeones, Fieles / Alto Valor, Potenciales, En Riesgo y Perdidos. "
+        "Permite analizar la fracción de la cartera y la contribución económica de cada segmento."
     )
 
-    # Cohesive corporate palette consistent with system alert thresholds (Red alert for risk, dark slate/charcoal for segments)
-    color_palette = {
-        "En Riesgo de Fuga": "#DC2626",         # Alerta crítica de fuga (Rojo)
-        "Clientes Clave": "#111827",            # Carbón oscuro principal
-        "Clientes Fieles": "#334155",           # Pizarra oscuro
-        "Nuevos / Prometedores": "#64748B",     # Pizarra medio
-        "Inactivos de Bajo Impacto": "#94A3B8", # Pizarra claro
+    SEGMENT_ORDER = [
+        "Campeones",
+        "Fieles / Alto Valor",
+        "Potenciales",
+        "En Riesgo",
+        "Perdidos",
+    ]
+    COLOR_PALETTE = {
+        "Campeones": "#10B981",          # Verde esmeralda (activo más valioso)
+        "Fieles / Alto Valor": "#2563EB", # Azul corporativo (clientes sólidos)
+        "Potenciales": "#F59E0B",        # Ámbar (oportunidad de crecimiento)
+        "En Riesgo": "#DC2626",          # Rojo alerta (retención urgente)
+        "Perdidos": "#64748B",           # Gris pizarra (bajo retorno esperado)
     }
 
-
-    tab_scatter, tab_segments = st.tabs([
-        "Matriz Estratégica (Recencia vs. Facturación)",
-        "Segmentación de Cartera (Impacto Económico)",
+    tab_distrib, tab_matrix = st.tabs([
+        "Distribución por Fracciones de Cartera",
+        "Matriz RFM 2D (Recencia vs. Frecuencia)",
     ])
 
-    with tab_scatter:
-        scatter_df = rfm_df.copy()
-        scatter_df["marker_size"] = scatter_df["frecuencia"].clip(lower=3, upper=100)
+    with tab_distrib:
+        col_m1, col_m2 = st.columns([1, 1])
+        with col_m1:
+            view_metric = st.radio(
+                "Métrica de Visualización",
+                options=["Facturación Acumulada ($)", "Cantidad de Clientes"],
+                horizontal=True,
+                key="rfm_segment_metric_toggle",
+            )
+        with col_m2:
+            chart_kind = st.radio(
+                "Tipo de Gráfico",
+                options=["Barras Horizontales", "Torta (Dona)"],
+                horizontal=True,
+                key="rfm_segment_chart_kind",
+            )
 
-        fig_scatter = px.scatter(
-            scatter_df,
-            x="recencia",
-            y="valor_monetario",
-            size="marker_size",
+        segment_summary = rfm_df.groupby("segmento", observed=False).agg(
+            clientes=("id_cliente", "count"),
+            facturacion=("valor_monetario", "sum"),
+        ).reindex(SEGMENT_ORDER).fillna(0).reset_index()
+
+        segment_summary["pct_facturacion"] = (
+            segment_summary["facturacion"] / total_value * 100
+        ).round(1) if total_value > 0 else 0.0
+        segment_summary["pct_clientes"] = (
+            segment_summary["clientes"] / len(rfm_df) * 100
+        ).round(1)
+
+        val_col = "facturacion" if view_metric == "Facturación Acumulada ($)" else "clientes"
+        segment_summary["text_display"] = segment_summary.apply(
+            lambda r: f"${r['facturacion']:,.0f} ({r['pct_facturacion']:.1f}%)"
+            if val_col == "facturacion"
+            else f"{int(r['clientes']):,} ({r['pct_clientes']:.1f}%)",
+            axis=1,
+        )
+
+        if chart_kind == "Barras Horizontales":
+            fig_bar = px.bar(
+                segment_summary,
+                x=val_col,
+                y="segmento",
+                orientation="h",
+                color="segmento",
+                color_discrete_map=COLOR_PALETTE,
+                text="text_display",
+                labels={val_col: "Valor", "segmento": "Categoría Oficial"},
+            )
+            fig_bar.update_traces(textposition="outside")
+            fig_bar.update_layout(
+                font=dict(family="Poppins"),
+                xaxis_title="Facturación Histórica Acumulada ($)" if val_col == "facturacion" else "Cantidad de Clientes",
+                yaxis_title=None,
+                yaxis=dict(autorange="reversed"),
+                margin=dict(t=10, b=20, l=10, r=80),
+                height=380,
+                showlegend=False,
+            )
+            st.plotly_chart(fig_bar, use_container_width=True)
+        else:
+            hover_tmpl = "%{label}<br>Facturación: $%{value:,.0f} (%{percent})" if val_col == "facturacion" else "%{label}<br>Clientes: %{value} (%{percent})"
+            fig_donut = px.pie(
+                segment_summary,
+                names="segmento",
+                values=val_col,
+                color="segmento",
+                color_discrete_map=COLOR_PALETTE,
+                hole=0.48,
+            )
+            fig_donut.update_traces(
+                textinfo="percent+label",
+                hovertemplate=hover_tmpl,
+            )
+            fig_donut.update_layout(
+                font=dict(family="Poppins"),
+                margin=dict(t=20, b=20, l=20, r=20),
+                height=380,
+                showlegend=True,
+            )
+            st.plotly_chart(fig_donut, use_container_width=True)
+
+    with tab_matrix:
+        st.caption(
+            "Mapeo de la cartera en la cuadrícula de Recencia (R1 = mayor inactividad, R5 = más reciente) "
+            "frente a Frecuencia (F1 = menor demanda, F5 = mayor demanda). "
+            "El color representa la categoría asignada y el tamaño del punto su volumen de facturación."
+        )
+
+        matrix_df = rfm_df.copy()
+        import numpy as np
+        np.random.seed(42)
+        matrix_df["R_plot"] = matrix_df["R"] + np.random.uniform(-0.16, 0.16, size=len(matrix_df))
+        matrix_df["F_plot"] = matrix_df["F"] + np.random.uniform(-0.16, 0.16, size=len(matrix_df))
+        matrix_df["marker_size"] = matrix_df["valor_monetario"].clip(lower=2000, upper=300000)
+
+        fig_matrix = px.scatter(
+            matrix_df,
+            x="R_plot",
+            y="F_plot",
             color="segmento",
-            color_discrete_map=color_palette,
-            hover_name="razon_social",
+            color_discrete_map=COLOR_PALETTE,
+            size="marker_size",
+            hover_name="id_cliente",
             hover_data={
                 "id_cliente": True,
+                "segmento": True,
                 "recencia": ":.0f días",
                 "frecuencia": ":.0f muestras",
                 "valor_monetario": ":$,.0f",
                 "rfm_score": True,
-                "segmento": True,
+                "R_plot": False,
+                "F_plot": False,
                 "marker_size": False,
             },
             labels={
-                "recencia": "Recencia (Días sin actividad)",
-                "valor_monetario": "Facturación Histórica ($)",
-                "segmento": "Segmento Comercial",
-                "frecuencia": "Muestras Históricas",
-                "rfm_score": "Score RFM",
+                "R_plot": "Quintil de Recencia (R)",
+                "F_plot": "Quintil de Frecuencia (F)",
+                "segmento": "Categoría",
             },
         )
-
-        fig_scatter.update_layout(
+        fig_matrix.update_layout(
             font=dict(family="Poppins"),
-            xaxis_title="Días de Inactividad (Recencia)",
-            yaxis_title="Facturación Histórica Acumulada ($)",
-            legend_title="Segmento Comercial",
-            height=460,
-            margin=dict(t=25, b=20, l=40, r=20),
-            hovermode="closest",
+            xaxis=dict(
+                tickvals=[1, 2, 3, 4, 5],
+                ticktext=["R1 (Inactivo)", "R2", "R3", "R4", "R5 (Reciente)"],
+                title="Recencia",
+            ),
+            yaxis=dict(
+                tickvals=[1, 2, 3, 4, 5],
+                ticktext=["F1 (Baja)", "F2", "F3", "F4", "F5 (Alta Demanda)"],
+                title="Frecuencia",
+            ),
+            height=430,
+            margin=dict(t=20, b=20, l=40, r=20),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         )
-        st.plotly_chart(fig_scatter, use_container_width=True)
-        st.caption(
-            "Guía de lectura: El tamaño de cada burbuja indica el volumen total de muestras procesadas. "
-            "Las burbujas en color rojo (En Riesgo de Fuga) en la zona superior derecha señalan las cuentas de mayor volumen que han dejado de operar recientemente."
-        )
-
-    with tab_segments:
-        segment_summary = rfm_df.groupby("segmento").agg(
-            clientes=("id_cliente", "count"),
-            facturacion=("valor_monetario", "sum"),
-        ).reset_index()
-
-        segment_summary["pct_facturacion"] = (segment_summary["facturacion"] / total_value * 100).round(1) if total_value > 0 else 0
-        segment_summary["pct_clientes"] = (segment_summary["clientes"] / len(rfm_df) * 100).round(1)
-
-        view_metric = st.radio(
-            "Métrica de Visualización de Cartera",
-            options=["Facturación Acumulada ($)", "Cantidad de Clientes"],
-            horizontal=True,
-            key="rfm_segment_metric_toggle",
-        )
-
-        val_col = "facturacion" if view_metric == "Facturación Acumulada ($)" else "clientes"
-        hover_tmpl = "%{label}<br>Facturación: $%{value:,.0f} (%{percent})" if val_col == "facturacion" else "%{label}<br>Clientes: %{value} (%{percent})"
-
-        fig_donut = px.pie(
-            segment_summary,
-            names="segmento",
-            values=val_col,
-            color="segmento",
-            color_discrete_map=color_palette,
-            hole=0.48,
-        )
-        fig_donut.update_traces(
-            textinfo="percent+label",
-            hovertemplate=hover_tmpl,
-        )
-        fig_donut.update_layout(
-            font=dict(family="Poppins"),
-            margin=dict(t=20, b=20, l=20, r=20),
-            height=380,
-            showlegend=True,
-        )
-        st.plotly_chart(fig_donut, use_container_width=True)
+        st.plotly_chart(fig_matrix, use_container_width=True)
 
     st.markdown("---")
 
-    # --- Priority Churn Risk Table (Colored & Styled) ---
-    st.markdown("#### Listado Prioritario de Clientes en Riesgo de Fuga")
+    # =========================================================================
+    # --- SECTION: Urgent Contact List (At-Risk Accounts) ---
+    # =========================================================================
+    st.markdown("#### Listado de Contactos Urgentes — Cuentas en Riesgo de Fuga")
     st.caption(
-        "Cuentas con baja recencia (quintil R 1 o 2) pero alta frecuencia o alto valor histórico (quintiles F o M 4 o 5). "
-        "Ordenadas por facturación descendente para priorizar la gestión comercial de recupero."
+        "Cuentas históricas de alto valor o alta frecuencia que presentan inactividad prolongada (Recencia R ≤ 2 con F o M ≥ 4). "
+        "Listado priorizado para contacto comercial urgente o futuro disparo automatizado de alertas por correo."
     )
 
     if at_risk_df.empty:
-        st.success("No se registran clientes en alerta de fuga con los parámetros actuales.")
+        st.markdown(
+            render_alert_box(
+                "Cartera en Estado Óptimo",
+                "No se registran clientes en alerta de fuga con los parámetros actuales.",
+                alert_type="success",
+            ),
+            unsafe_allow_html=True,
+        )
     else:
-        at_risk_df["contribucion_riesgo"] = (at_risk_df["valor_monetario"] / at_risk_value * 100).round(1) if at_risk_value > 0 else 0.0
+        at_risk_df["contribucion_riesgo"] = (
+            at_risk_df["valor_monetario"] / at_risk_value * 100
+        ).round(1) if at_risk_value > 0 else 0.0
 
         risk_display_cols = [
             "id_cliente",
-            "razon_social",
             "nivel_alerta",
             "recencia",
             "frecuencia",
             "valor_monetario",
             "contribucion_riesgo",
             "rfm_score",
+            "accion_recomendada",
         ]
         risk_table_df = at_risk_df[risk_display_cols].copy()
+        risk_table_df["id_cliente"] = risk_table_df["id_cliente"].apply(lambda cid: f"Cliente #{cid}")
         risk_table_df.columns = [
             "ID Cliente",
-            "Razón Social",
-            "Nivel de Alerta",
-            "Días Inactivo",
+            "Nivel de Prioridad",
+            "Días sin Enviar",
             "Muestras Históricas",
             "Facturación ($)",
             "% del Riesgo Total",
             "Score RFM",
+            "Acción Sugerida",
         ]
 
         def highlight_at_risk_rows(row):
-            if "Crítico" in str(row["Nivel de Alerta"]):
+            if "Crítico" in str(row["Nivel de Prioridad"]):
                 return ["background-color: #FEE2E2; color: #991B1B; font-weight: 600;"] * len(row)
             return ["background-color: #FFF1F2; color: #9F1239; font-weight: 500;"] * len(row)
 
         styled_risk = risk_table_df.style.apply(highlight_at_risk_rows, axis=1).format({
             "Facturación ($)": "${:,.0f}",
-            "Días Inactivo": "{:,.0f} días",
+            "Días sin Enviar": "{:,.0f} días",
             "Muestras Históricas": "{:,.0f}",
             "% del Riesgo Total": "{:.1f}%",
         })
@@ -300,20 +359,21 @@ def render_rfm_segmentation_view():
 
     st.markdown("---")
 
-    # --- Full RFM Table (Colored & Styled by Segment) ---
+    # =========================================================================
+    # --- SECTION: Full RFM Table (Colored & Styled by Segment) ---
+    # =========================================================================
     with st.expander("Ver Segmentación RFM Completa de la Cartera (Todos los Clientes)"):
         col_f1, col_f2 = st.columns([2, 2])
         with col_f1:
-            segment_options = sorted(rfm_df["segmento"].unique().tolist())
             selected_segments = st.multiselect(
-                "Filtrar por Segmento(s) Comercial(es)",
-                options=segment_options,
+                "Filtrar por Categoría(s) de Negocio",
+                options=SEGMENT_ORDER,
                 default=[],
-                placeholder="Todos los segmentos",
-                help="Seleccione uno o varios segmentos. Si se deja vacío, se muestran todos los segmentos.",
+                placeholder="Todas las categorías...",
+                help="Seleccione una o varias categorías para filtrar la tabla.",
             )
         with col_f2:
-            search_query = st.text_input("Buscar por ID o Razón Social", placeholder="Ej: 350 o Agro...")
+            search_query = st.text_input("Buscar por ID de Cliente", placeholder="Ej: 392...")
 
         filtered_full_rfm = rfm_df.copy()
         if selected_segments:
@@ -321,13 +381,11 @@ def render_rfm_segmentation_view():
         if search_query.strip():
             query_str = search_query.strip().lower()
             filtered_full_rfm = filtered_full_rfm[
-                filtered_full_rfm["id_cliente"].astype(str).str.contains(query_str) |
-                filtered_full_rfm["razon_social"].astype(str).str.lower().str.contains(query_str)
+                filtered_full_rfm["id_cliente"].astype(str).str.contains(query_str)
             ]
 
         full_display_cols = [
             "id_cliente",
-            "razon_social",
             "segmento",
             "recencia",
             "frecuencia",
@@ -336,12 +394,13 @@ def render_rfm_segmentation_view():
             "F",
             "M",
             "rfm_score",
+            "accion_recomendada",
         ]
         full_table_df = filtered_full_rfm[full_display_cols].copy()
+        full_table_df["id_cliente"] = full_table_df["id_cliente"].apply(lambda cid: f"Cliente #{cid}")
         full_table_df.columns = [
             "ID Cliente",
-            "Razón Social",
-            "Segmento Comercial",
+            "Categoría de Cliente",
             "Días Inactivo",
             "Total Muestras",
             "Facturación ($)",
@@ -349,20 +408,22 @@ def render_rfm_segmentation_view():
             "Quintil F",
             "Quintil M",
             "Score RFM",
+            "Estrategia Recomendada",
         ]
 
         def highlight_full_portfolio(row):
-            seg = str(row["Segmento Comercial"])
-            if "En Riesgo" in seg:
+            seg = str(row["Categoría de Cliente"])
+            if seg == "En Riesgo":
                 return ["background-color: #FEE2E2; color: #991B1B; font-weight: 600;"] * len(row)
-            elif "Clientes Clave" in seg:
-                return ["background-color: #DCFCE7; color: #166534; font-weight: 500;"] * len(row)
-            elif "Clientes Fieles" in seg:
+            elif seg == "Campeones":
+                return ["background-color: #DCFCE7; color: #166534; font-weight: 600;"] * len(row)
+            elif seg == "Fieles / Alto Valor":
                 return ["background-color: #EFF6FF; color: #1E40AF;"] * len(row)
-            elif "Nuevos" in seg or "Prometedores" in seg:
+            elif seg == "Potenciales":
                 return ["background-color: #FEF3C7; color: #92400E; font-weight: 500;"] * len(row)
+            elif seg == "Perdidos":
+                return ["background-color: #F1F5F9; color: #475569;"] * len(row)
             return [""] * len(row)
-
 
         styled_full = full_table_df.style.apply(highlight_full_portfolio, axis=1).format({
             "Facturación ($)": "${:,.0f}",
@@ -381,8 +442,8 @@ def render_rfm_segmentation_view():
         st.markdown("##### Distribución Matricial de Quintiles RF")
         st.caption(
             "La matriz térmica 5x5 resume las 25 intersecciones operativas entre Recencia y Frecuencia. "
-            "El cuadrante superior izquierdo (R1-R2 con F4-F5) concentra a las cuentas de mayor volumen que dejaron de operar (riesgo de fuga), "
-            "mientras que el cuadrante superior derecho (R4-R5 con F4-F5) agrupa a los clientes más activos y regulares."
+            "El cuadrante superior izquierdo (R1-R2 con F4-F5) concentra a las cuentas en riesgo de fuga, "
+            "mientras que el cuadrante superior derecho (R4-R5 con F4-F5) agrupa a los Campeones del laboratorio."
         )
 
         view_heatmap = st.radio(

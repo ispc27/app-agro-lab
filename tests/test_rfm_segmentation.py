@@ -38,9 +38,13 @@ def sample_rfm_df():
 
 
 def test_rfm_scoring_and_agreement_exclusion(sample_rfm_df):
-    rfm = compute_rfm_score(sample_rfm_df, exclude_agreements=True)
+    # Default: exclude_agreements=False, so 50001 is included (all clients equal)
+    rfm_all = compute_rfm_score(sample_rfm_df)
+    assert 50001 in rfm_all["id_cliente"].values
+    assert len(rfm_all) == 11
 
-    # 50001 must be excluded
+    # When explicit exclude_agreements=True is passed
+    rfm = compute_rfm_score(sample_rfm_df, exclude_agreements=True)
     assert 50001 not in rfm["id_cliente"].values
     assert len(rfm) == 10
 
@@ -79,15 +83,20 @@ def test_cycle_filtering(sample_rfm_df):
 
 
 def test_strategic_segments_and_alert_levels(sample_rfm_df):
-    rfm = compute_rfm_score(sample_rfm_df, exclude_agreements=True)
+    rfm = compute_rfm_score(sample_rfm_df)
 
     assert "segmento" in rfm.columns
     assert "nivel_alerta" in rfm.columns
+    assert "accion_recomendada" in rfm.columns
 
-    # Verify that all at-risk clients have "En Riesgo de Fuga"
+    # Verify that valid segments are exclusively from the 5 official categories
+    official_segments = {"Campeones", "Fieles / Alto Valor", "Potenciales", "En Riesgo", "Perdidos"}
+    assert set(rfm["segmento"].unique()).issubset(official_segments)
+
+    # Verify that all at-risk clients have segment "En Riesgo"
     at_risk = rfm[rfm["en_riesgo"]]
-    assert (at_risk["segmento"] == "En Riesgo de Fuga").all()
-    assert at_risk["nivel_alerta"].str.contains("Fuga|Crítico|Alto", case=False).all()
+    assert (at_risk["segmento"] == "En Riesgo").all()
+    assert at_risk["nivel_alerta"].str.contains("Riesgo|Crítico|Alto", case=False).all()
 
     # Verify that non-risk clients have "Activo Saludable"
     healthy = rfm[~rfm["en_riesgo"]]
