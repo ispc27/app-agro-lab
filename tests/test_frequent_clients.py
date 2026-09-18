@@ -71,3 +71,38 @@ def test_multi_crop_species_filtering(sample_agro_df):
     assert 3 in vol_multi["id_cliente"].values
     assert 2 not in vol_multi["id_cliente"].values  # Cliente B only has Trigo
 
+
+def test_client_behavior_profile_and_recency(sample_agro_df):
+    # In sample_agro_df:
+    # Cliente 1 (A): only Soja (1 species, 1 month - August) -> Estacional
+    # Cliente 2 (B): only Trigo (1 species, 1 month - August) -> Estacional
+    # Cliente 3 (C): only Maíz (1 species, 1 month - August) -> Estacional
+    vol = compute_volume_by_client(sample_agro_df, client_status="todos")
+    assert "tipo_cliente" in vol.columns
+    assert "dias_inactivo" in vol.columns
+    assert set(vol["tipo_cliente"].unique()).issubset({"Estacional", "Mixto"})
+    assert (vol["dias_inactivo"] >= 0).all()
+
+    # Create multi-species client
+    multi_df = sample_agro_df.copy()
+    # Add a sample of Maíz for Cliente 1
+    new_sample = pd.DataFrame([{
+        "fecha_ing_muestra": pd.Timestamp("2026-09-01"),
+        "id_muestra": 999,
+        "id_cliente": 1,
+        "razon_social": "Cliente A",
+        "especies": "Maíz",
+        "importe_solicitud": 1000.0,
+    }])
+    multi_df = pd.concat([multi_df, new_sample], ignore_index=True)
+
+    vol_multi_prof = compute_volume_by_client(multi_df, client_profile="mixto")
+    assert len(vol_multi_prof) == 1
+    assert vol_multi_prof.iloc[0]["id_cliente"] == 1
+    assert vol_multi_prof.iloc[0]["tipo_cliente"] == "Mixto"
+
+    vol_estacional = compute_volume_by_client(multi_df, client_profile="estacional")
+    assert 1 not in vol_estacional["id_cliente"].values
+    assert 2 in vol_estacional["id_cliente"].values
+
+

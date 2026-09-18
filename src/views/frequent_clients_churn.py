@@ -1,16 +1,11 @@
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from src.components.theme import render_header
+from src.components.theme import render_header, render_metric_card
 from src.config.settings import load_agronomic_data
 from src.modules.frequent_clients_churn import (
     compute_volume_by_client,
 )
-
-
-def render_metric_card(label: str, value: str, badge_text: str | None = None, badge_bg: str = "#EFF6FF", badge_color: str = "#1E40AF") -> str:
-    badge_html = f'<span style="background-color: {badge_bg}; color: {badge_color}; font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; white-space: nowrap;">{badge_text}</span>' if badge_text else ""
-    return f'<div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px 18px; min-height: 98px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02);"><div style="color: #64748B; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">{label}</div><div style="display: flex; align-items: baseline; gap: 8px; flex-wrap: nowrap;"><span style="color: #111827; font-size: 1.55rem; font-weight: 700; line-height: 1.2;">{value}</span>{badge_html}</div></div>'
 
 
 def render_frequent_clients_churn_view():
@@ -75,7 +70,7 @@ def render_frequent_clients_churn_view():
             disabled=(preset != "Personalizado"),
         )
 
-    col_species, col_status, col_convenio = st.columns([2, 2, 2])
+    col_species, col_status, col_profile = st.columns([2, 1, 1])
     with col_species:
         selected_species = st.multiselect(
             "Especie(s) de cultivo",
@@ -86,14 +81,18 @@ def render_frequent_clients_churn_view():
         )
     with col_status:
         client_status = st.selectbox(
-            "Estado del cliente",
+            "Estado de actividad",
             options=["Todos", "Activos", "Inactivos"],
             index=0,
-            help="Filtrar por clientes con envíos en la ventana (Activos) o sin envíos en la ventana (Inactivos).",
+            help="Criterio: Activo = registra al menos 1 envío en la ventana seleccionada. Inactivo = cuenta histórica sin envíos en el período.",
         )
-    with col_convenio:
-        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-        exclude_agreements = st.checkbox("Excluir convenios (ID > 50.000)", value=False)
+    with col_profile:
+        client_profile = st.selectbox(
+            "Tipo de cliente",
+            options=["Todos", "Estacional", "Mixto"],
+            index=0,
+            help="Criterio agronómico: Estacional = monocultivo o envíos en 1-2 meses de campaña. Mixto = multicultivo o actividad en 3 o más meses.",
+        )
 
     if start_date_input > end_date_input:
         st.error("La fecha Desde no puede ser posterior a la fecha Hasta.")
@@ -107,7 +106,7 @@ def render_frequent_clients_churn_view():
         end_date=end_date_input,
         crop_species=species_filter,
         client_status=client_status,
-        exclude_agreements=exclude_agreements,
+        client_profile=client_profile,
     )
 
     if volume_df.empty:
@@ -121,8 +120,9 @@ def render_frequent_clients_churn_view():
     total_muestras_sum = int(volume_df["total_muestras"].sum())
 
     top_row = volume_df[volume_df["total_muestras"] > 0].iloc[0] if not volume_df[volume_df["total_muestras"] > 0].empty else None
-    leader_name = str(top_row["razon_social"]) if top_row is not None else "Sin envíos"
+    leader_label = f"Cliente #{top_row['id_cliente']}" if top_row is not None else "Sin envíos"
     leader_pct = float(top_row["porcentaje_total"]) if top_row is not None else 0.0
+    leader_vol = int(top_row["total_muestras"]) if top_row is not None else 0
 
     avg_active_samples = (total_muestras_sum / active_count) if active_count > 0 else 0.0
 
@@ -150,8 +150,8 @@ def render_frequent_clients_churn_view():
         st.markdown(
             render_metric_card(
                 "Cliente Líder",
-                leader_name[:20] + ("..." if len(leader_name) > 20 else ""),
-                badge_text=f"{leader_pct:.1f}% del total",
+                leader_label,
+                badge_text=f"{leader_pct:.1f}% ({leader_vol:,} m.)".replace(",", "."),
                 badge_bg="#EFF6FF",
                 badge_color="#1E40AF",
             ),
@@ -168,45 +168,65 @@ def render_frequent_clients_churn_view():
 
     st.markdown("---")
 
-    # --- Top 10 Plotly Chart ---
-    st.markdown("#### Top 10 Clientes por Volumen de Muestras")
-    top_10_df = volume_df.head(10).sort_values("total_muestras", ascending=True).copy()
+    # --- Charts Section: Top 10 + Behavior Profile Distribution ---
+    col_chart_top, col_chart_profile = st.columns([3, 2])
 
-    def _format_client_label(row):
-        rz = str(row.get("razon_social", "")).strip()
-        cid = row["id_cliente"]
-        if rz and rz.upper() not in ["NN", "NAN", "NONE"]:
-            return f"{rz} ({cid})"
-        return f"Cliente {cid}"
+    with col_chart_top:
+        st.markdown("#### Top 10 Clientes por Volumen de Muestras")
+        top_10_df = volume_df.head(10).sort_values("total_muestras", ascending=True).copy()
+        top_10_df["cliente_label"] = top_10_df["id_cliente"].apply(lambda cid: f"Cliente #{cid}")
 
-    top_10_df["cliente_label"] = top_10_df.apply(_format_client_label, axis=1)
+        if top_10_df["total_muestras"].sum() == 0:
+            st.info("Todos los clientes en esta selección registran 0 muestras en el período seleccionado.")
+        else:
+            fig_top = px.bar(
+                top_10_df,
+                x="total_muestras",
+                y="cliente_label",
+                orientation="h",
+                text="total_muestras",
+                labels={"total_muestras": "Cantidad de Muestras", "cliente_label": "Cliente"},
+                color_discrete_sequence=["#111827"],
+            )
+            fig_top.update_traces(
+                texttemplate="%{text:,}",
+                textposition="outside",
+                hovertemplate="Cliente: %{y}<br>Muestras: %{x:,}<extra></extra>",
+            )
+            fig_top.update_layout(
+                font=dict(family="Poppins"),
+                showlegend=False,
+                height=350,
+                margin=dict(l=90, r=40, t=10, b=20),
+                xaxis_title="Volumen de Muestras",
+                yaxis_title=None,
+            )
+            st.plotly_chart(fig_top, use_container_width=True)
 
-    if top_10_df["total_muestras"].sum() == 0:
-        st.info("Todos los clientes en esta selección registran 0 muestras ingresadas en el período seleccionado (cuentas inactivas).")
-    else:
-        fig = px.bar(
-            top_10_df,
-            x="total_muestras",
-            y="cliente_label",
-            orientation="h",
-            text="total_muestras",
-            labels={"total_muestras": "Cantidad de Muestras", "cliente_label": "Cliente"},
-            color_discrete_sequence=["#111827"],
+    with col_chart_profile:
+        st.markdown("#### Distribución por Comportamiento (Estacional vs. Mixto)")
+        profile_counts = volume_df["tipo_cliente"].value_counts().reset_index()
+        profile_counts.columns = ["tipo_cliente", "cantidad"]
+
+        fig_profile = px.pie(
+            profile_counts,
+            names="tipo_cliente",
+            values="cantidad",
+            hole=0.52,
+            color="tipo_cliente",
+            color_discrete_map={
+                "Estacional": "#1E293B",
+                "Mixto": "#64748B",
+            },
         )
-        fig.update_traces(
-            texttemplate="%{text:,}",
-            textposition="outside",
-            hovertemplate="Cliente: %{y}<br>Muestras: %{x:,}<extra></extra>",
-        )
-        fig.update_layout(
+        fig_profile.update_traces(textinfo="percent+label", textposition="outside")
+        fig_profile.update_layout(
             font=dict(family="Poppins"),
+            height=350,
+            margin=dict(t=20, b=20, l=10, r=10),
             showlegend=False,
-            height=380,
-            margin=dict(l=110, r=40, t=20, b=20),
-            xaxis_title="Volumen de Muestras",
-            yaxis_title=None,
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig_profile, use_container_width=True)
 
     # --- Detailed Client Table with Pandas Styler ---
     st.markdown("#### Listado Completo de Clientes Ordenado por Volumen")
@@ -214,28 +234,29 @@ def render_frequent_clients_churn_view():
 
     col_search, _ = st.columns([2, 2])
     with col_search:
-        search_kw = st.text_input("Buscar cliente por ID o Razón Social", placeholder="Ej: 105 o Agro...")
+        search_kw = st.text_input("Buscar por ID de Cliente", placeholder="Ej: 392...")
 
     filtered_clients = volume_df.copy()
     if search_kw.strip():
         kw = search_kw.strip().lower()
         filtered_clients = filtered_clients[
             filtered_clients["id_cliente"].astype(str).str.contains(kw)
-            | filtered_clients["razon_social"].astype(str).str.lower().str.contains(kw)
         ]
 
-    display_cols = ["id_cliente", "razon_social", "total_muestras", "porcentaje_total", "estado_cliente"]
+    display_cols = ["id_cliente", "total_muestras", "porcentaje_total", "estado_cliente", "tipo_cliente", "dias_inactivo"]
     table_df = filtered_clients[display_cols].copy()
-    table_df.columns = ["ID Cliente", "Razón Social", "Total Muestras", "% de Participación", "Estado"]
+    table_df.columns = ["ID Cliente", "Total Muestras", "% de Participación", "Estado", "Tipo de Cliente", "Recencia (Días)"]
 
     def highlight_client_status(row):
-        if str(row["Estado"]) == "Activo":
+        st_val = str(row["Estado"])
+        if st_val == "Activo":
             return ["background-color: #DCFCE7; color: #166534; font-weight: 500;"] * len(row)
         return ["background-color: #F8FAFC; color: #64748B;"] * len(row)
 
     styled_clients = table_df.style.apply(highlight_client_status, axis=1).format({
         "Total Muestras": "{:,.0f}",
         "% de Participación": "{:.2f}%",
+        "Recencia (Días)": "{:,.0f} d.",
     })
 
     st.dataframe(
