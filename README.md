@@ -59,7 +59,7 @@ app-agro-lab/
 │   └── raw/
 │       └── BD_lab_28-8-26.xlsx    # Fuente original de datos del laboratorio
 ├── notebooks/
-│   └── 01_eda_crisp_dm.ipynb     # Notebook oficial de EDA y Profiling CRISP-DM
+│   └── 01_eda_analytics_crisp_dm.ipynb  # Notebook oficial de EDA y Profiling CRISP-DM
 └── src/
     ├── components/             # Componentes visuales (Tema monocromático y Sidebar)
     ├── config/                 # Configuración del entorno y pipeline ETL en caché

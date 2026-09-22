@@ -588,7 +588,7 @@ print("\\n✓ Pipeline CRISP-DM completado exitosamente y listo para consumo en 
     nb.cells = cells
     
     # Escribir archivo de notebook
-    notebook_target = os.path.join("notebooks", "01_eda_crisp_dm.ipynb")
+    notebook_target = os.path.join("notebooks", "01_eda_analytics_crisp_dm.ipynb")
     os.makedirs(os.path.dirname(notebook_target), exist_ok=True)
     with open(notebook_target, "w", encoding="utf-8") as f:
         nbf.write(nb, f)
