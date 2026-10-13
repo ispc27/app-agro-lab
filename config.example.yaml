@@ -2,6 +2,56 @@ credentials:
   usernames:
     admin:
       email: admin@agrolab.com
-      full_name: Agrolab
+      full_name: Agrolab Admin
       role: admin
+      password: "$2b$12$U7ayml.p7p88vUf39Uov6.5ml1/t6VLBu2OXSZv7K6fGV90GihWKm"
+    pia:
+      email: maria.fava@agrolab.com
+      full_name: Maria Pia Fava Perez
+      role: responsable_laboratorio
+      password: "$2b$12$U7ayml.p7p88vUf39Uov6.5ml1/t6VLBu2OXSZv7K6fGV90GihWKm"
+    santiago:
+      email: santiago.ortega@agrolab.com
+      full_name: Santiago Andrés Ortega
+      role: analista_laboratorio
+      password: "$2b$12$U7ayml.p7p88vUf39Uov6.5ml1/t6VLBu2OXSZv7K6fGV90GihWKm"
+    sabrina:
+      email: sabrina.maldonado@agrolab.com
+      full_name: Sabrina Elizabeth Maldonado
+      role: responsable_rrii
+      password: "$2b$12$U7ayml.p7p88vUf39Uov6.5ml1/t6VLBu2OXSZv7K6fGV90GihWKm"
+    julieta:
+      email: julieta.strada@agrolab.com
+      full_name: Julieta Strada
+      role: comercial
+      password: "$2b$12$U7ayml.p7p88vUf39Uov6.5ml1/t6VLBu2OXSZv7K6fGV90GihWKm"
+    juan:
+      email: juan.calero@agrolab.com
+      full_name: Juan Calero
+      role: admin
+      password: "$2b$12$U7ayml.p7p88vUf39Uov6.5ml1/t6VLBu2OXSZv7K6fGV90GihWKm"
+    enzo:
+      email: enzo.cabana@agrolab.com
+      full_name: Enzo Cabana
+      role: responsable_laboratorio
+      password: "$2b$12$U7ayml.p7p88vUf39Uov6.5ml1/t6VLBu2OXSZv7K6fGV90GihWKm"
+    resp_lab:
+      email: resp.laboratorio@agrolab.com
+      full_name: Responsable de Laboratorio
+      role: responsable_laboratorio
+      password: "$2b$12$U7ayml.p7p88vUf39Uov6.5ml1/t6VLBu2OXSZv7K6fGV90GihWKm"
+    analista_lab:
+      email: analista.laboratorio@agrolab.com
+      full_name: Analista de Laboratorio
+      role: analista_laboratorio
+      password: "$2b$12$U7ayml.p7p88vUf39Uov6.5ml1/t6VLBu2OXSZv7K6fGV90GihWKm"
+    resp_rrii:
+      email: resp.rrii@agrolab.com
+      full_name: Responsable de RRII
+      role: responsable_rrii
+      password: "$2b$12$U7ayml.p7p88vUf39Uov6.5ml1/t6VLBu2OXSZv7K6fGV90GihWKm"
+    comercial:
+      email: comercial@agrolab.com
+      full_name: Responsable Comercial
+      role: comercial
       password: "$2b$12$U7ayml.p7p88vUf39Uov6.5ml1/t6VLBu2OXSZv7K6fGV90GihWKm"
